@@ -1,12 +1,13 @@
 """What the staff may change about a person (D-081, D-087).
 
-A person is an account with a customer number, or an invited person who has not completed the registration
-(``person_filter``). Functions here:
+A person is an account with a customer number, or a person invited before 2026-11-19 who has not completed the
+registration (``person_filter``). Functions here:
 
 * staff-only data in the side record ``PersonRecord`` (note, grid operator customer number, share history);
 * the address correction suggested by the address directory;
-* ``create_person`` / ``resend_invitation`` (D-087): the account has no password and no customer number until the
-  person completes the registration (``accounts.invitations``);
+* ``create_person`` (D-087, owner 2026-11-19): the person is complete and active at once, with a customer number and
+  no email; ``resend_invitation`` serves only the invitations of before that day that are still pending
+  (``accounts.invitations``);
 * support changes of customer data (``update_customer_data``, ``update_payment_data``, ``change_second_email``).
   Never the login address, password, second factor, status, ``is_staff``, ``is_superuser``, groups, retention
   flag or customer number (D-012, D-034). Data of a staff user or administrator is changed only by an
@@ -22,7 +23,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 
-from leg_platform.accounts import email_change, invitations, security_log
+from leg_platform.accounts import email_change, invitations, rate_limits, security_log
 from leg_platform.accounts.encryption import DecryptionError
 from leg_platform.accounts.models import (
     SWITZERLAND,
@@ -278,11 +279,12 @@ def _check_actor(actor, person):
 
 
 def create_person(actor, email, values):
-    """Create a person with the staff's data and invite them (D-087); return the account.
+    """Create a person with the staff's data (D-087, owner 2026-11-19); return the account.
 
-    ``values`` are the registration profile fields (``UserManager.INVITATION_PROFILE_FIELDS``). The account is
-    unverified: no password, no customer number (issued at registration, D-021), no privileges. If a limit refuses
-    the invitation email, nothing is created (``PersonError("rate_limited")``).
+    ``values`` are the profile fields (``UserManager.PERSON_PROFILE_FIELDS``). The person has to do nothing and
+    gets no email: the account is active with a customer number (D-021) and no privileges, and the person sets a
+    password with "Forgot password" when they want to sign in. Above the limit per staff account nothing is
+    created (``PersonError("rate_limited")``).
 
     ``email_invalid`` for an impossible address, ``email_in_use`` if another non-deactivated account holds it
     (an unverified self-registration does not hold it and is replaced, D-016). A ``ValidationError`` names data
@@ -307,21 +309,20 @@ def create_person(actor, email, values):
             if pending is None:
                 raise PersonError("email_in_use")
             pending.delete()
+        if not rate_limits.consume(rate_limits.SCOPE_PERSON_CREATION, str(actor.pk), rate_limits.PERSON_CREATION_LIMITS):
+            raise PersonError("rate_limited")
         try:
             with transaction.atomic():
-                user = user_model.objects.create_invited_user(email, **values)
+                user = user_model.objects.create_person_account(email, **values)
         except IntegrityError:
             raise PersonError("email_in_use") from None
-        if not invitations.queue(user, actor):
-            raise PersonError("rate_limited")
         history.record(user, HistoryEvent.CREATED, actor)
-        history.record(user, HistoryEvent.PERSON_INVITATION_SENT, actor)
-        security_log.record(SecurityEvent.Event.PERSON_INVITED, account=user, actor=actor)
+        security_log.record(SecurityEvent.Event.PERSON_CREATED, account=user, actor=actor)
     return user
 
 
 def resend_invitation(person, actor):
-    """Send the invitation of a not yet registered person again (D-087): the earlier link ends.
+    """Send the invitation of a person invited before 2026-11-19 who has not registered yet again: the earlier link ends.
     ``PersonError("rate_limited")`` at a limit; ``PersonError("not_invited")`` for any other account."""
     _actor_row(actor)
     with transaction.atomic():

@@ -1,6 +1,7 @@
 """The dialogs that create a person and change the data of a customer (D-087): the pages, their negative authorization, the
 guard for the data of staff users and administrators, the CSRF check, the return to a safe address, the answer for a
-duplicate email address, the invitation button, and that no IBAN or other value reaches a search, a log or the history.
+duplicate email address, the button that sends a pending invitation of before 2026-11-19 again, and that no IBAN or other
+value reaches a search, a log or the history.
 The rules themselves are at service level (``community/tests/test_person_support.py``)."""
 
 from datetime import timedelta
@@ -15,6 +16,7 @@ from django.utils import timezone
 from leg_platform.accounts import rate_limits
 from leg_platform.accounts.models import MailJob, PendingEmailChange, SecurityEvent, VerificationToken
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user, run_mail_queue
+from leg_platform.accounts.tests.legacy_invitation import invite_legacy_person
 from leg_platform.community import history, persons
 from leg_platform.community.models import HistoryEntry, PersonRecord
 from leg_platform.community.tests.helpers import staff_user
@@ -28,6 +30,11 @@ CREATE = {
     "email": "erika.neu@example.org", "salutation": "mrs", "organisation_name": "", "first_name": "Erika",
     "last_name": "Neu", "address_line_1": "", "street": "Neuweg", "house_number": "3", "postal_code": "3000",
     "town": "Bern", "country": "CH", "phone_number": "",
+}
+# A person invited before 2026-11-19 who has not registered yet (the data the invitation of that time carried).
+PENDING = {
+    "first_name": "Erika", "last_name": "Neu", "street": "Neuweg", "house_number": "3", "swiss_postal_code": 3000,
+    "town": "Bern", "country": "CH",
 }
 
 
@@ -58,14 +65,15 @@ class PersonDataPageTests(TestCase):
 
     # Create a person ------------------------------------------------------------------------------------
 
-    def test_the_list_has_the_button_and_the_dialog_is_a_normal_page_with_the_registration_fields(self):
+    def test_the_list_has_the_button_and_the_dialog_is_a_normal_page_with_the_fields_of_the_person(self):
         client = self.login(self.staff)
         list_page = client.get(LIST)
         self.assertContains(list_page, f'href="{NEW}?next=')
         page = client.get(NEW, {"next": LIST})
         for text in (
-            "Person anlegen", "Die Person erhält eine E-Mail mit einem Link", "E-Mail", "Anrede", "Firma", "Vorname",
-            "Nachname", "Zweite Person", "Strasse", "Hausnummer", "PLZ", "Ort", "Land", "Telefon", "Abbrechen",
+            "Person anlegen", "Die Person erhält keine E-Mail und muss nichts tun.", "E-Mail", "Anrede", "Firma",
+            "Vorname", "Nachname", "Zweite Person", "Strasse", "Hausnummer", "Postfach", "PLZ", "Ort", "Land",
+            "Telefon", "Abbrechen",
             "csrfmiddlewaretoken", f'<input type="hidden" name="next" value="{LIST}">',
             # The suggestions of the address directory, as in the registration and the profile.
             "data-address-directory", 'src="/static/js/address-directory.js"', "address-suggest",
@@ -74,10 +82,13 @@ class PersonDataPageTests(TestCase):
         for field in ("is_staff", "is_superuser", "password", "groups", "customer_number", "status"):
             self.assertNotContains(page, f'name="{field}"')
         self.assertNotContains(page, "Kundennummer")
+        self.assertNotContains(page, "Einladung")
+        # The street is not required beside a post office box (an invitation needed it, the account rule does not).
+        self.assertNotContains(page, "Geben Sie die Strasse ein.")
         self.assertFalse(User.objects.filter(email="erika.neu@example.org").exists())  # looking creates nothing
         self.assertContains(page, f'href="{LIST}"')  # "Abbrechen" goes back where the person came from
 
-    def test_saving_creates_an_invited_person_who_is_listed_at_once_and_goes_back(self):
+    def test_saving_creates_an_active_person_who_is_listed_at_once_and_goes_back(self):
         client = self.login(self.staff)
         response = client.post(NEW, {**CREATE, "next": LIST})
         person = User.objects.get(email="erika.neu@example.org")
@@ -85,31 +96,32 @@ class PersonDataPageTests(TestCase):
         self.assertRedirects(
             response, f"{self.url('detail', person)}?new=1&next={LIST.replace('/', '%2F')}", fetch_redirect_response=False
         )
-        self.assertEqual((person.status, person.customer_number_id, person.has_usable_password()), ("unverified", None, False))
+        # Active with a customer number at once; nothing is sent and nothing is left to complete.
+        self.assertEqual((person.status, person.is_active, person.invited_at), ("active", True, None))
+        self.assertRegex(person.customer_number_id, r"^\d{6}$")
         opened = client.get(self.url("detail", person), {"new": "1"})
-        self.assertContains(
-            opened, "Person angelegt. Die Einladung wurde gesendet. Ein Messpunkt kann zugeordnet werden, sobald sich die Person registriert hat und eine Kundennummer besitzt."
-        )
+        self.assertContains(opened, "Person angelegt. Weiter: Messpunkt zuordnen.")
         page = client.get(LIST)
-        for text in ("Erika Neu", "Eingeladen"):
+        for text in ("Erika Neu", person.customer_number_display):
             self.assertContains(page, text)
         self.assertContains(page, f'href="{self.url("detail", person)}"')
-        # The list does not show a number for her; the search finds her by name and address.
         self.assertNotContains(client.get(LIST, {"q": "Neuweg"}), "Keine Personen gefunden.")
-        # The detail page names the state, offers the button and shows the data that the staff entered.
+        # The detail page shows the data that the staff entered, the number, no invitation and no button for one.
         detail = client.get(self.url("detail", person))
         self.assertEqual(detail.status_code, 200)
-        for text in ("Erika Neu", "Eingeladen", "Einladung erneut senden", "Neuweg 3", "3000 Bern", "Einladung gesendet"):
+        for text in ("Erika Neu", "Neuweg 3", "3000 Bern", person.customer_number_display):
             self.assertContains(detail, text)
+        for text in ("Eingeladen", "Einladung erneut senden", "Einladungslink"):
+            self.assertNotContains(detail, text)
         self.assertContains(detail, self.url("details", person))
-        # The history of the person names the actor.
-        self.assertEqual([e.actor for e in history.entries_for(person)], [self.staff, self.staff])
-        # The email goes out through the queue; then the page says how long the link is valid.
+        # The history of the person names the actor; the security log has the event.
+        self.assertEqual([e.actor for e in history.entries_for(person)], [self.staff])
+        self.assertEqual(SecurityEvent.objects.filter(event=SecurityEvent.Event.PERSON_CREATED, account_id=person.pk).count(), 1)
+        # No email: not queued, not sent.
+        self.assertFalse(MailJob.objects.exists())
         run_mail_queue()
-        self.assertEqual([m.to for m in mail.outbox], [["erika.neu@example.org"]])
-        self.assertContains(client.get(self.url("detail", person)), "Der Einladungslink ist bis")
-        VerificationToken.objects.filter(user=person).update(expires_at=timezone.now() - timedelta(minutes=1))
-        self.assertContains(client.get(self.url("detail", person)), "Der Einladungslink ist abgelaufen.")
+        self.assertEqual(mail.outbox, [])
+        self.assertFalse(VerificationToken.objects.filter(user=person).exists())
 
     def test_a_duplicate_address_is_refused_without_telling_who_has_it(self):
         client = self.login(self.staff)
@@ -129,7 +141,7 @@ class PersonDataPageTests(TestCase):
             ({"postal_code": "30"}, "Geben Sie eine Postleitzahl mit 4 Ziffern von 1000 bis 9999 ein."),
             ({"postal_code": "ABCD"}, "Geben Sie eine Postleitzahl mit 4 Ziffern von 1000 bis 9999 ein."),
             ({"email": "no address"}, "Geben Sie eine gültige E-Mail-Adresse ein."),
-            ({"street": ""}, "Geben Sie die Strasse ein."),
+            ({"street": ""}, "Geben Sie eine Strasse oder ein Postfach ein."),
             ({"town": ""}, "mgmt-field-error"),
             ({"phone_number": "123"}, "mgmt-field-error"),
             ({"country": "XX"}, "mgmt-field-error"),
@@ -141,10 +153,14 @@ class PersonDataPageTests(TestCase):
             # What was typed stays in the form.
             html = page.content.decode()
             self.assertTrue(any(f'value="{typed}"' in html for typed in ("Neuweg", "Erika", "Neu")), msg=str(data))
-        self.assertFalse(User.objects.filter(invited_at__isnull=False).exists())
-        # A company needs no contact person; a foreign address has a free postal code.
+        self.assertFalse(User.objects.filter(email="erika.neu@example.org").exists())
+        # A company needs no contact person; a post office box does without a street; a foreign address has a free
+        # postal code.
         done = client.post(NEW, {**CREATE, "email": "firma.neu@example.org", "organisation_name": "Beispiel AG", "first_name": "", "last_name": ""})
         self.assertEqual(done.status_code, 302)
+        done = client.post(NEW, {**CREATE, "email": "box.neu@example.org", "street": "", "house_number": "", "post_office_box_number": "17"})
+        self.assertEqual(done.status_code, 302)
+        self.assertEqual(User.objects.get(email="box.neu@example.org").post_office_box_number, 17)
         done = client.post(NEW, {**CREATE, "email": "abroad.neu@example.org", "country": "DE", "postal_code": "10115"})
         self.assertEqual(done.status_code, 302)
         self.assertEqual(User.objects.get(email="abroad.neu@example.org").foreign_postal_code, "10115")
@@ -154,12 +170,11 @@ class PersonDataPageTests(TestCase):
         client.post(NEW, {**CREATE, "is_staff": "on", "is_superuser": "on", "status": "active", "customer_number": "123456",
                           "groups": "1", "password": "x", "retention_obligation": "on", "invited_at": "2020-01-01"})
         person = User.objects.get(email="erika.neu@example.org")
-        self.assertEqual(
-            (person.is_staff, person.is_superuser, person.status, person.customer_number_id, person.retention_obligation),
-            (False, False, "unverified", None, False),
-        )
-        self.assertFalse(person.groups.exists() or person.user_permissions.exists() or person.has_usable_password())
-        self.assertGreater(person.invited_at, timezone.now() - timedelta(minutes=5))
+        self.assertEqual((person.is_staff, person.is_superuser, person.status, person.retention_obligation), (False, False, "active", False))
+        self.assertNotEqual(person.customer_number_id, "123456")  # issued by the account logic, never posted
+        self.assertFalse(person.groups.exists() or person.user_permissions.exists())
+        self.assertIsNone(person.invited_at)
+        self.assertFalse(person.check_password("x"))
 
     def test_a_person_created_from_the_assign_dialog_opens_her_page_and_comes_back_from_there(self):
         client = self.login(self.staff)
@@ -183,7 +198,7 @@ class PersonDataPageTests(TestCase):
                 fetch_redirect_response=False,
             )
         self.assertEqual(client.get(NEW, {"next": HOSTILE[0]}).context["back_url"], LIST)
-        with patch.object(rate_limits, "INVITATION_ACTOR_LIMITS", ((1, timedelta(hours=1)),)):
+        with patch.object(rate_limits, "PERSON_CREATION_LIMITS", ((1, timedelta(hours=1)),)):
             page = client.post(NEW, {**CREATE, "email": "limited@example.org"})
         self.assertEqual(page.status_code, 200)
         self.assertContains(page, "Zu viele Anfragen")
@@ -191,20 +206,28 @@ class PersonDataPageTests(TestCase):
 
     # The resend button ----------------------------------------------------------------------------------
 
-    def test_the_invitation_is_sent_again_from_the_detail_page_and_only_for_an_invited_person(self):
+    def test_a_pending_invitation_is_sent_again_from_the_detail_page_and_only_for_that(self):
         client = self.login(self.staff)
-        client.post(NEW, {**CREATE, "next": LIST})
-        person = User.objects.get(email="erika.neu@example.org")
+        person = invite_legacy_person(self.staff, "erika.neu@example.org", PENDING)
+        detail = client.get(self.url("detail", person))
+        for text in ("Eingeladen", "Einladung erneut senden", "Einladung gesendet"):
+            self.assertContains(detail, text)
+        run_mail_queue()
+        self.assertContains(client.get(self.url("detail", person)), "Der Einladungslink ist bis")
+        VerificationToken.objects.filter(user=person).update(expires_at=timezone.now() - timedelta(minutes=1))
+        self.assertContains(client.get(self.url("detail", person)), "Der Einladungslink ist abgelaufen.")
+        mail.outbox.clear()
+        MailJob.objects.all().delete()
         post = self.url("invitation", person)
         with patch.object(rate_limits, "INVITATION_ACCOUNT_LIMITS", ((1000, timedelta(seconds=1)),)):
             response = client.post(post, {"next": self.url("detail", person)})
         self.assertRedirects(response, self.url("detail", person), fetch_redirect_response=False)
         self.assertContains(client.get(self.url("detail", person)), "Die Einladung wurde gesendet.")
-        self.assertEqual(MailJob.objects.filter(account=person).count(), 2)
+        self.assertEqual(MailJob.objects.filter(account=person).count(), 1)
         # The pause: a second click at once is refused with the usual words.
         again = client.post(post, follow=True)
         self.assertContains(again, "Zu viele Anfragen")
-        self.assertEqual(MailJob.objects.filter(account=person).count(), 2)
+        self.assertEqual(MailJob.objects.filter(account=person).count(), 1)
         # A person who completed the registration has no invitation.
         refused = client.post(self.url("invitation", self.anna), follow=True)
         self.assertContains(refused, "Es gibt keine Einladung")

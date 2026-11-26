@@ -187,6 +187,8 @@ class UserModelConfigurationTests(SimpleTestCase):
                 "community.ShareChange",
                 "community.HistoryEntry",
                 "community.ManagementSettings",
+                # The Swisseldex Datahub access, system administrators only (D-139).
+                "datahub.DatahubConfiguration",
             },
         )
 

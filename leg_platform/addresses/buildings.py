@@ -165,7 +165,7 @@ def _unique(rows):
     return tuple(found[identity] for identity in sorted(found))[:RESULT_LIMIT]
 
 
-def _directory_answers():
+def directory_answers():
     """Whether the local directory can answer a building question: published, with building identifiers, readable."""
     try:
         directory = Directory.objects.filter(pk=1).first()
@@ -180,7 +180,7 @@ def local_egids(street, house_number, postal_code):
 
     The postal code fixes the town, so the town is not asked. Never an outbound request (D-105)."""
     cleaned = clean(street, house_number, postal_code, "")
-    if cleaned is None or not _directory_answers():
+    if cleaned is None or not directory_answers():
         return None
     return {building.egid for building in _local(*cleaned)}
 

@@ -208,6 +208,92 @@ class PersonalCardTests(TestCase):
         self.assertContains(page, "Weitere Angaben (optional)")
         for name in ("salutation", "organisation_name", "address_line_1", "post_office_box_number", "phone_number"):
             self.assertContains(page, f'name="{name}"')
+        # The salutation and the company name are not folded away (owner, 2026-11-16).
+        html = page.content.decode()
+        folded = html[html.index('<details class="more-details"'):]
+        folded = folded[: folded.index("</details>")]
+        for name in ("salutation", "organisation_name"):
+            self.assertNotIn(f'name="{name}"', folded)
+        for name in ("address_line_1", "post_office_box_number", "country", "phone_number"):
+            self.assertIn(f'name="{name}"', folded)
+
+    def rows(self, user=None):
+        """The rows of the card "Personal details" in its read state: ``[(label, value)]``."""
+        if user is not None:
+            self.client.force_login(user)
+        html = self.client.get(PROFILE_URL).content.decode()
+        card = html[html.index('id="card-personal"'):]
+        card = card[: card.index("</section>")]
+        return [
+            (label, " ".join(re.sub(r"<[^>]+>", " ", value).split()))
+            for label, value in re.findall(r'<div class="profile-row"><dt>(.*?)</dt><dd>(.*?)</dd></div>', card, re.S)
+        ]
+
+    def test_the_card_shows_the_name_only_when_nothing_else_is_stored(self):
+        self.assertEqual([label for label, _value in self.rows()], ["Name", "Adresse"])
+
+    def test_the_card_shows_the_salutation_and_the_company_of_a_person(self):
+        user = create_active_user(
+            "with.company@example.org", salutation="family", organisation_name="Muster & Co <AG>"
+        )
+
+        rows = self.rows(user)
+
+        self.assertEqual(
+            rows[:3], [("Anrede", "Familie"), ("Name", "Anna Example"), ("Firmenname", "Muster &amp; Co &lt;AG&gt;")]
+        )
+
+    def test_the_card_of_a_company_without_a_personal_name_shows_the_company_once(self):
+        user = create_active_user(
+            "company.only@example.org", first_name="", last_name="", organisation_name="Beispiel AG"
+        )
+
+        rows = self.rows(user)
+
+        self.assertEqual([label for label, _value in rows], ["Name", "Adresse"])
+        self.assertEqual(rows[0], ("Name", "Beispiel AG"))
+
+    def test_the_company_is_shown_beside_a_single_name(self):
+        user = create_active_user(
+            "one.name@example.org", first_name="", last_name="Muster", organisation_name="Beispiel AG"
+        )
+
+        self.assertEqual(self.rows(user)[:2], [("Name", "Muster"), ("Firmenname", "Beispiel AG")])
+
+    def test_a_company_saves_the_card_without_the_name_of_a_person_and_a_person_cannot(self):
+        data = {
+            "salutation": "", "first_name": "", "last_name": "", "organisation_name": "Beispiel AG",
+            "street": "Neue Strasse", "house_number": "3", "postal_code": "3063", "town": "Ittigen", "country": "CH",
+        }
+
+        response = self.client.post(reverse("accounts:profile_edit"), data)
+
+        self.assertRedirects(response, f"{PROFILE_URL}#card-personal", fetch_redirect_response=False)
+        self.user.refresh_from_db()
+        self.assertEqual(
+            (self.user.first_name, self.user.last_name, self.user.organisation_name, self.user.salutation),
+            ("", "", "Beispiel AG", ""),
+        )
+        self.assertEqual(self.rows()[0], ("Name", "Beispiel AG"))
+        # Without the company the rule of the model asks for both names, under the name fields.
+        refused = self.client.post(reverse("accounts:profile_edit"), {**data, "organisation_name": ""})
+        self.assertContains(refused, "Geben Sie einen Vornamen oder einen Firmennamen ein.")
+        self.assertContains(refused, "Geben Sie einen Nachnamen oder einen Firmennamen ein.")
+        self.assertNotContains(refused, 'id="id_organisation_name_error"')
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.organisation_name, "Beispiel AG")
+
+    def test_the_salutation_can_be_set_and_removed_and_only_a_known_one_is_accepted(self):
+        data = {
+            "first_name": "Berta", "last_name": "Muster", "street": "Neue Strasse", "house_number": "3",
+            "postal_code": "3063", "town": "Ittigen", "country": "CH",
+        }
+        for value, stored, status in (("mr", "mr", 302), ("dr", "mr", 200), ("", "", 302)):
+            with self.subTest(value=value):
+                response = self.client.post(reverse("accounts:profile_edit"), {**data, "salutation": value})
+                self.assertEqual(response.status_code, status)
+                self.user.refresh_from_db()
+                self.assertEqual(self.user.salutation, stored)
 
 
 @tag("mariadb")

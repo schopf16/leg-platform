@@ -42,7 +42,7 @@ ADMIN_GROUPS = (
     ),
 )
 SYSTEM_ORDER = (
-    "ImportRequest", "HousekeepingStatus", "LogMenu", "LogFiles", "FailedLogins", "SecurityEvent",
+    "ImportRequest", "DatahubConfiguration", "HousekeepingStatus", "LogMenu", "LogFiles", "FailedLogins", "SecurityEvent",
 )
 # Entries that are not in the sidebar (design review B): the mail settings are reached from the log menu.
 SIDEBAR_HIDDEN = ("AccessAttempt", "AccessFailureLog", "GraphConfiguration")

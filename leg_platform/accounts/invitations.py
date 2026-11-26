@@ -1,9 +1,12 @@
-"""The invitation of a person whom staff created (D-087; docs/SECURITY.md, section 3).
+"""The invitations of before 2026-11-19 that may still be pending (D-087; docs/SECURITY.md, section 3).
 
-Staff create the account (``UserManager.create_invited_user``) and never set a password. The person
-gets a single-use, time-limited link (purpose ``registration``) and goes through the registration
-steps; only the last step activates the account and issues the customer number (D-021, D-058). Until
-then the account is unverified: no login, customer number, privileges or groups.
+Staff create no invitation any more: since the owner decision of 2026-11-19 a person entered by staff is active at
+once (``UserManager.create_person_account``) and gets no email. An account that staff invited earlier and that has not
+completed the registration still has its link (purpose ``registration``), is sent a new one on request
+(``persons.resend_invitation``, or when its owner registers the address, ``registration``) and goes through the
+registration steps; only the last step activates the account and issues the customer number (D-021, D-058). Until then
+the account is unverified: no login, customer number, privileges or groups. Such an account is deleted when its link has
+expired (D-016), so this module can go once no pending invitation is left (``docs/DECISIONS.md``, D-087).
 
 The email is queued like every other (outbox, D-037; no raw token is stored). Address and instance
 limits apply; instead of the client-address limit the staff account has its own limit and each invited

@@ -205,11 +205,12 @@ class PersonDataForm(forms.Form):
 
 
 class PersonCreateForm(PersonDataForm):
-    """"Person anlegen": the registration data (D-087), confirmed by the person at registration."""
+    """"Person anlegen": the person's data as staff enter it (D-087). Only the rules of the account apply (name or
+    company, street or post office box, postal code, town, country); nothing is asked that only an invitation needed."""
 
     field_names = (
         "email", "salutation", "organisation_name", "first_name", "last_name", "address_line_1", "street",
-        "house_number", "postal_code", "town", "country", "phone_number",
+        "house_number", "post_office_box_number", "postal_code", "town", "country", "phone_number",
     )
     groups = (persons.GROUP_DETAILS, persons.GROUP_ADDRESS, persons.GROUP_CONTACT)
     layout = [
@@ -219,22 +220,15 @@ class PersonCreateForm(PersonDataForm):
         ("pair", ["first_name", "last_name"]),
         ("single", ["address_line_1"]),
         ("street", ["street", "house_number"]),
+        ("single", ["post_office_box_number"]),
         ("postal", ["postal_code", "town"]),
         ("single", ["country"]),
         ("single", ["phone_number"]),
     ]
-    optional = ("salutation", "organisation_name", "first_name", "last_name", "address_line_1", "phone_number")
-
-    def clean(self):
-        cleaned = super().clean()
-        # The registration asks for a street. The account rule says "street or post office box", which this form has no
-        # field for, so its message is replaced by one that names the street only (C-12).
-        model_message = str(_("Enter a street or a post office box."))
-        if "street" in self.errors and list(self.errors["street"]) == [model_message]:
-            del self.errors["street"]
-        if not self.cleaned_data.get("street") and "street" not in self.errors:
-            self.add_error("street", _("Enter the street."))
-        return cleaned
+    optional = (
+        "salutation", "organisation_name", "first_name", "last_name", "address_line_1", "post_office_box_number",
+        "phone_number",
+    )
 
 
 class DetailsForm(PersonDataForm):

@@ -70,6 +70,7 @@ MESSAGES = {
     Event.ACCOUNT_SESSIONS_ENDED_BY_ADMIN: "All sessions of an account were ended by a system administrator",
     Event.RETENTION_OBLIGATION_SET: "The retention obligation of an account was set",
     Event.LIST_PRINTED: "A list of the management area was printed as PDF",
+    Event.PERSON_CREATED: "A person was created by staff",
     Event.PERSON_INVITED: "A person was created and invited by staff",
     Event.INVITATION_RESENT: "An invitation was sent again by staff",
     Event.ACCOUNT_DATA_CHANGED_BY_STAFF: "The data of an account was changed by staff",
@@ -81,6 +82,8 @@ MESSAGES = {
     Event.RENDER_AS_ENDED: "A staff member ended the support view of an account",
     Event.RENDER_AS_PAGE_VIEWED: "A page was shown in the support view of an account",
     Event.RENDER_AS_REQUEST_REFUSED: "A request was refused in the support view of an account",
+    Event.DATAHUB_CONFIGURATION_CHANGED: "The Swisseldex Datahub configuration was changed",
+    Event.DATAHUB_CONNECTION_TESTED: "The Swisseldex Datahub connection was tested",
 }
 
 

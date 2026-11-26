@@ -1,0 +1,5 @@
+{% load i18n %}{% comment %}
+The company name beside the name of a person, at the registration and in the profile. Its hint is the name rule
+(``User.name_errors``: a first and a last name, or a company name) in the words of a customer: a private person sees
+that the field is not for them, a company that the name of a person may stay empty. Context: ``field``.
+{% endcomment %}{% include "accounts/_field.html" with field=field optional=True hint=_("Only for a company. First and last name may then stay empty.") %}

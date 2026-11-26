@@ -48,19 +48,29 @@ def ask(client, email=EMAIL, **extra):
     return response
 
 
+PERSON_DATA = {
+    "salutation": "mrs", "first_name": "Erika", "last_name": "Neu", "address_line_1": "c/o Treuhand",
+    "street": "Neuweg", "house_number": "3", "swiss_postal_code": 3000, "town": "Bern", "country": "CH",
+    "phone_number": "+41311234567",
+}
+
+
 def invited_user(email):
-    """An address that staff invited (D-087): its account is pending and carries ``invited_at``."""
+    """An address that staff invited before 2026-11-19 (D-087): its account is pending and carries ``invited_at``."""
+    from leg_platform.accounts.tests.legacy_invitation import invite_legacy_person
+    from leg_platform.community.tests.helpers import staff_user
+
+    invite_legacy_person(staff_user(f"staff.{email}"), email, PERSON_DATA)
+    mail_queue.process_pending()
+    return User.objects.get(normalized_email=email)
+
+
+def created_person(email):
+    """An address that staff entered (D-087, owner 2026-11-19): the account is active and has a customer number."""
     from leg_platform.community import persons
     from leg_platform.community.tests.helpers import staff_user
 
-    data = {
-        "salutation": "mrs", "first_name": "Erika", "last_name": "Neu", "address_line_1": "c/o Treuhand",
-        "street": "Neuweg", "house_number": "3", "swiss_postal_code": 3000, "town": "Bern", "country": "CH",
-        "phone_number": "+41311234567",
-    }
-    persons.create_person(staff_user(f"staff.{email}"), email, data)
-    mail_queue.process_pending()
-    return User.objects.get(normalized_email=email)
+    return persons.create_person(staff_user(f"staff.{email}"), email, PERSON_DATA)
 
 
 def other_code(code):
@@ -197,6 +207,7 @@ class UniformAnswerTests(TestCase):
         blocked.set_status(User.Status.BLOCKED)
         pending = User.objects.create_user("pending.person@example.org")
         invited = invited_user("invited.person@example.org")
+        created = created_person("created.person@example.org")
         deactivated = create_active_user("gone.person@example.org")
         deactivated.set_status(User.Status.DEACTIVATED)
         return [
@@ -205,6 +216,7 @@ class UniformAnswerTests(TestCase):
             blocked.email,
             pending.email,
             invited.email,
+            created.email,
             deactivated.email,
             "unknown@example.org",
         ]

@@ -181,6 +181,10 @@ class Location(AddressSuggestionMixin, TimestampedModel):
         _("EGID"), null=True, blank=True, unique=True,
         validators=[MinValueValidator(1), MaxValueValidator(EGID_MAX)],
     )
+    # The transformer circuit follows the building (EGID, the station of the address directory) unless the staff chose
+    # one by hand; removing the manual choice returns to the derived one.
+    circuit_manual = models.BooleanField(_("transformer circuit set by hand"), default=False)
+
     class Meta:
         default_permissions = ("view",)
         verbose_name = _("location")

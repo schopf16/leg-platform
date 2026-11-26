@@ -593,7 +593,10 @@ class VerificationTests(TestCase):
 
         self.assertEqual(
             list(form.fields),
-            ["first_name", "last_name", "street", "house_number", "postal_code", "town", "privacy"],
+            [
+                "salutation", "first_name", "last_name", "organisation_name", "street", "house_number",
+                "postal_code", "town", "privacy",
+            ],
         )
 
     def test_an_unreachable_address_directory_gives_no_note_on_any_step(self):

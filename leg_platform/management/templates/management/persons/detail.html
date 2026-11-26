@@ -6,10 +6,10 @@ the left; cooperative and note on the right) and the metering points over the fu
 under the other, the metering points after the payment card. Every card of the customer's data has the button "Edit"
 (a dialog, specification section 4) for an account whose data the actor may change (``can_edit``, D-087: not the data of
 a staff user or a system administrator, unless the actor is a system administrator; never the archive). The login address,
-the password, the second factor, the status, the rights and the customer number are shown only. A person whom staff
-invited and who has not completed the registration has no customer number yet; the head shows "Invited" and the button
-"Resend invitation". No button "Start registration" (no specified effect; never a dead button), no "block" or "deactivate"
-(not decided). The card "Processes" lists the person's applications and deregistrations (``process_views.person_entries``);
+the password, the second factor, the status, the rights and the customer number are shown only. A person created by staff
+has a customer number at once. Only a person invited before 2026-11-19 who has not completed the registration has none
+yet; the head shows "Invited" and the button "Resend invitation" until that invitation is gone. No button "Start
+registration" (no specified effect; never a dead button), no "block" or "deactivate" (not decided). The card "Processes" lists the person's applications and deregistrations (``process_views.person_entries``);
 the header links to the account in the administration for a viewer with the user permission (``account_admin_url``).
 {% endcomment %}
 {% block title %}{{ page_title }}{% endblock %}
@@ -51,7 +51,7 @@ the header links to the account in the administration for a viewer with the user
   </div>
 
   {% if show_new %}
-    {% if invitation %}{% translate "Person created. The invitation was sent. A metering point can be assigned once the person has registered and has a customer number." as new_text %}{% else %}{% translate "Person created. Next: assign a metering point." as new_text %}{% endif %}
+    {% translate "Person created. Next: assign a metering point." as new_text %}
     {% if origin_point_url %}
       {% include "management/_banner.html" with text=new_text actions="management/persons/_new_actions.html" neutral=True %}
     {% else %}

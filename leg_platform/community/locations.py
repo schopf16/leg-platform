@@ -86,6 +86,7 @@ def accept_suggestion(location, actor):
         fresh.save()
         history.record(fresh, HistoryEvent.ADDRESS_CORRECTION_ACCEPTED, actor)
         location_egid.resolve(fresh, actor)
+        transformer_circuits.derive(fresh, actor)
     return fresh
 
 
@@ -116,6 +117,7 @@ def create_location(
     location = Location(
         street=street, house_number=house_number, postal_code=postal_code, town=town,
         address_addition=address_addition, transformer_circuit=transformer_circuit,
+        circuit_manual=transformer_circuit is not None or new_circuit is not None,
         remark=remark.strip(), needs_confirmation=needs_confirmation,
     )
     location.full_clean()
@@ -125,6 +127,7 @@ def create_location(
         location.save()
         history.record(location, HistoryEvent.CREATED, actor)
         location_egid.resolve(location, actor)
+        transformer_circuits.derive(location, actor)
     refresh_suggestion(location)
     return location
 
@@ -165,6 +168,7 @@ def update_address(
             history.record(fresh, HistoryEvent.ADDRESS_CHANGED, actor)
         # Also when only the EGID is missing (a location saved before the directory knew the address).
         location_egid.resolve(fresh, actor)
+        transformer_circuits.derive(fresh, actor)
     refresh_suggestion(fresh)
     return fresh
 
@@ -216,10 +220,17 @@ def set_circuit(location, circuit, actor=None, new_circuit=None):
         if new_circuit is not None:
             circuit = transformer_circuits.create(*new_circuit)
         before = fresh.transformer_circuit
+        fresh.circuit_manual = circuit is not None
+        if circuit is None:
+            # Back to the circuit of the building (the station of the directory), or none; ``derive`` logs a change.
+            fresh.save(update_fields=["circuit_manual", "updated_at"])
+            transformer_circuits.derive(fresh, actor, clear_when_unavailable=True)
+            return fresh
         if before == circuit:
+            fresh.save(update_fields=["circuit_manual", "updated_at"])
             return fresh
         fresh.transformer_circuit = circuit
-        fresh.save(update_fields=["transformer_circuit", "updated_at"])
+        fresh.save(update_fields=["transformer_circuit", "circuit_manual", "updated_at"])
         history.record(
             fresh, HistoryEvent.TRANSFORMER_CIRCUIT_CHANGED, actor,
             {"old": before.grid_number if before else "", "new": circuit.grid_number if circuit else ""},

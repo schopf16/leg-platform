@@ -493,6 +493,9 @@ class RegistrationEmailTests(TestCase):
             message.body,
         )
         self.assertRegex(message.body, r"Zur Anmeldung:\n\nhttps?://\S+/login/")
+        # Also a person whom staff entered has no password yet: the way is "Forgot password?" (D-087).
+        self.assertIn("Wenn Sie noch kein Passwort haben oder es nicht kennen", message.body)
+        self.assertIn("«Passwort vergessen?»", message.body)
         self.assertNotIn("/register/verify/", message.body)
 
     def test_the_two_mails_can_still_be_edited_in_the_administration(self):

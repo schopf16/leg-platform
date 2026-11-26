@@ -109,7 +109,7 @@ class FilterTests(SimpleTestCase):
     def test_the_filter_draws_the_grouped_number_in_one_element_that_does_not_wrap(self):
         self.assertEqual(
             render("{{ number|metering_point }}", number=OWNER_NUMBER),
-            f'<span class="mp-number">{OWNER_SHOWN}</span>',
+            f'<span class="mp-number"><span class="mp-number-head">{OWNER_SHOWN[:-2]}</span>23</span>',
         )
 
     def test_the_text_filter_gives_the_grouped_number_without_the_element(self):

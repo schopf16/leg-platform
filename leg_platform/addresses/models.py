@@ -109,6 +109,8 @@ class Address(models.Model):
                 ],
                 name="addr_house",
             ),
+            # Is a building (EGID) in the current generation: the transformer station of a location (D-118).
+            models.Index(fields=["generation", "egid"], name="addr_generation_egid"),
         ]
 
     def fill_keys(self):

@@ -13,11 +13,17 @@ from django.utils import timezone
 from leg_platform.accounts.models import MailJob, SessionCodeFailure
 from leg_platform.accounts.tests.helpers import PASSWORD, VerifiedClient, code_for
 from leg_platform.accounts.tests.test_second_factor import create_user_with_totp
-from leg_platform.community import deregistrations, history, numbers, own_iban
+from leg_platform.community import deregistrations, history, own_iban
 from leg_platform.community.application_common import add_months, month_end
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import Deregistration, Direction, MeteringPoint
-from leg_platform.community.tests.helpers import assign_person, make_location, make_metering_point, staff_user
+from leg_platform.community.tests.helpers import (
+    assign_person,
+    make_location,
+    make_metering_point,
+    number_markup,
+    staff_user,
+)
 from leg_platform.customer import limits, returns
 from leg_platform.customer.tests.helpers import BUILDINGS, GOOD_IBAN, customer, login
 from leg_platform.customer.tests.test_card_edit import submitted
@@ -94,12 +100,12 @@ class PageTests(DeregistrationCase):
         self.assertNotIn("Verbindlich kündigen", html)
         self.assertCountEqual(all_boxes(html), [str(self.draw.pk), str(self.feed_in.pk)])
         self.assertCountEqual(checked_boxes(html), [str(self.draw.pk), str(self.feed_in.pk)])
-        self.assertIn(numbers.format_metering_point_number(self.draw.number), html)
+        self.assertIn(number_markup(self.draw.number), html)
         self.assertIn("Wohnhaus", html)
         self.assertRegex(html, r"Bezug · Seit \d\d\.\d\d\.\d{4}")
         self.assertIn("Einspeisung", html)
         # Nothing of the other customer at the same building.
-        self.assertNotIn(numbers.format_metering_point_number(self.foreign.number), html)
+        self.assertNotIn(number_markup(self.foreign.number), html)
         self.assertNotIn(self.foreign.number, html)
         self.assertNotIn("Fremd", html)
 
@@ -334,7 +340,7 @@ class SubmitTests(DeregistrationCase):
 
         self.assertEqual(page.status_code, 200)
         for text in (
-            "Ihre Abmeldung ist abgeschickt", numbers.format_metering_point_number(self.draw.number), "Zu den Gebäuden",
+            "Ihre Abmeldung ist abgeschickt", number_markup(self.draw.number), "Zu den Gebäuden",
         ):
             self.assertIn(text, html)
         self.assertNotIn("Konto löschen", html)

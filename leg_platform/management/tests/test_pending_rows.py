@@ -8,10 +8,10 @@ from django.test import tag
 from django.urls import reverse
 
 from leg_platform.community.models import Application
-from leg_platform.community.tests.helpers import make_location
+from leg_platform.community.tests.helpers import make_location, number_markup
 from leg_platform.community.tests.onboarding import full_number
 from leg_platform.management import pending
-from leg_platform.management.tests.test_process_corrections import CorrectionBase, shown
+from leg_platform.management.tests.test_process_corrections import CorrectionBase
 
 
 @tag("mariadb")
@@ -26,7 +26,7 @@ class PendingRowsTests(CorrectionBase):
         self.assertContains(page, "Ittigenstrasse 51")
         self.assertContains(page, f'href="{self.building_url()}?next=')
         self.assertContains(page, f'href="{self.point_url()}?next=')
-        self.assertContains(page, shown(1))
+        self.assertContains(page, number_markup(full_number(1)))
         self.assertContains(page, "Anna Muster")
 
     def test_the_metering_points_list_shows_the_points_with_their_dialog(self):

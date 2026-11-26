@@ -14,6 +14,8 @@ TASKS = (
     "process_application_deadlines",
     # The EGID of a location follows its address (community app, D-135).
     "fill_location_egids",
+    # The circuit follows the station of the EGID set just before, unless chosen by hand (community app).
+    "fill_transformer_circuits",
     "cleanup_mail_requests",
     "cleanup_login_ip_attempts",
     "cleanup_security_log",

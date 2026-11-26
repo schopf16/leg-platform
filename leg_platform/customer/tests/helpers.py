@@ -13,6 +13,7 @@ from django.urls import reverse
 from leg_platform.accounts.tests.helpers import VerifiedClient
 from leg_platform.community import applications, buildings
 from leg_platform.community.models import Direction
+from leg_platform.community.tests.helpers import number_markup  # noqa: F401  (re-exported for the tests)
 from leg_platform.community.tests.onboarding import (  # noqa: F401  (re-exported for the tests)
     ADDRESS,
     GOOD_IBAN,

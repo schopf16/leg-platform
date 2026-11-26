@@ -24,7 +24,13 @@ from leg_platform.community.models import (
     ApplicationNotice,
     Direction,
 )
-from leg_platform.community.tests.helpers import assign_person, make_location, make_metering_point, staff_user
+from leg_platform.community.tests.helpers import (
+    assign_person,
+    make_location,
+    make_metering_point,
+    number_markup,
+    staff_user,
+)
 from leg_platform.community.tests.onboarding import (
     ADDRESS,
     TODAY,
@@ -138,8 +144,8 @@ class TheNumberAndThePlantDetailsAreReadableTests(CorrectionBase):
     def test_the_number_is_one_element_with_the_grid_operators_block_and_blocks_of_four(self):
         page = self.client.get(self.page_url())
 
-        self.assertContains(page, f'<span class="mp-number">{shown(1)}</span>')
-        self.assertContains(page, f'<span class="mp-number">{shown(2)}</span>')
+        self.assertContains(page, number_markup(full_number(1)))
+        self.assertContains(page, number_markup(full_number(2)))
         self.assertContains(page, f"CH1A2B3C4D5E6{NBSP}0000{NBSP}0000{NBSP}0000{NBSP}0000{NBSP}0001")
         self.assertNotContains(page, "<wbr>")
         self.assertNotContains(page, full_number(1))  # never the 33 characters in one piece
@@ -186,14 +192,14 @@ class TheNumberAndThePlantDetailsAreReadableTests(CorrectionBase):
         location = self.client.get(reverse("management:locations_detail", args=[place.pk])).content.decode()
 
         for page in (listing, person, location):
-            self.assertIn(f'<span class="mp-number">{shown(5)}</span>', page)
+            self.assertIn(number_markup(full_number(5)), page)
             self.assertNotIn("<wbr>", page)
             self.assertNotIn(full_number(5), page)
 
     def test_the_customers_pages_show_the_number_the_same_way(self):
         page = self.login(self.anna).get(reverse("customer:buildings")).content.decode()
 
-        self.assertIn(f'<span class="mp-number">{shown(1)}</span>', page)
+        self.assertIn(number_markup(full_number(1)), page)
         self.assertNotIn(full_number(1), page)
 
 
@@ -372,7 +378,7 @@ class TheDialogOfAMeteringPointTests(CorrectionBase):
         row = self.refreshed(self.feed_in)
         self.assertEqual((row.number, row.pv_power_kwp), (full_number(77), Decimal("9.50")))
         page = self.client.get(self.page_url())
-        self.assertContains(page, f'<span class="mp-number">{shown(77)}</span>')
+        self.assertContains(page, number_markup(full_number(77)))
         self.assertContains(page, "Messpunkt durch die LEG korrigiert")
         entry = history.entries_for(self.application).get(event=HistoryEvent.APPLICATION_POINT_CORRECTED)
         self.assertEqual(entry.detail, {"point_id": self.feed_in.pk, "fields": ["number", "pv_power_kwp"]})

@@ -101,8 +101,112 @@ class CompletionFormTests(TestCase):
         self.assertIn('inputmode="numeric"', element(self.html, "id_postal_code"))
         self.assertIn('autocomplete="off"', element(self.html, "id_house_number"))
         # The fields that only the profile has are not asked at the registration (K15).
-        for field_id in ("id_salutation", "id_organisation_name", "id_address_line_1", "id_phone_number"):
+        for field_id in ("id_address_line_1", "id_phone_number", "id_post_office_box_number", "id_country"):
             self.assertNotIn(f'id="{field_id}"', self.html)
+
+    def test_the_details_step_offers_the_salutation_and_the_company_name_as_voluntary_fields(self):
+        html = self.html
+        # Marked as voluntary; the salutation before the name, the company name after it, both before the address.
+        for label, field_id in (("Anrede", "id_salutation"), ("Firmenname", "id_organisation_name")):
+            with self.subTest(field=field_id):
+                text = label_of(html, field_id)
+                self.assertTrue(text.startswith(label), text)
+                self.assertIn("(freiwillig)", text)
+                self.assertNotRegex(element(html, field_id), r"\brequired\b")
+        order = [
+            html.index(' id="id_salutation"'),
+            html.index(' id="id_first_name"'),
+            html.index(' id="id_last_name"'),
+            html.index(' id="id_organisation_name"'),
+            html.index(' id="id_street"'),
+        ]
+        self.assertEqual(order, sorted(order))
+        # The choices of the model, the empty one first and selected; no row of dashes.
+        select = html[html.index('<select name="salutation"'):]
+        select = select[: select.index("</select>")]
+        self.assertEqual(
+            re.findall(r'<option value="([^"]*)"( selected)?>([^<]*)</option>', select),
+            [("", " selected", "–"), ("mrs", "", "Frau"), ("mr", "", "Herr"), ("family", "", "Familie")],
+        )
+        self.assertIn('autocomplete="organization"', element(html, "id_organisation_name"))
+        self.assertIn('maxlength="60"', element(html, "id_organisation_name"))
+        # The name rule in the words of a customer, tied to the company field; the names are not marked voluntary and
+        # carry no ``required`` (with a company they may stay empty).
+        self.assertIn(
+            '<div class="form-hint" id="id_organisation_name_hint">Nur für Firmen. Vorname und Nachname dürfen dann '
+            "leer bleiben.</div>",
+            html,
+        )
+        self.assertIn('aria-describedby="id_organisation_name_hint"', element(html, "id_organisation_name"))
+        for field_id in ("id_first_name", "id_last_name"):
+            self.assertNotIn("(freiwillig)", label_of(html, field_id))
+            self.assertNotRegex(element(html, field_id), r"\brequired\b")
+
+    def test_a_person_registers_without_the_two_voluntary_fields(self):
+        data = completion_data(registration=self.token.pk, salutation="", organisation_name="")
+
+        self.assertEqual(self.client.post(COMPLETE_URL, data).status_code, 302)
+
+        user = User.objects.get()
+        self.assertEqual(
+            (user.status, user.salutation, user.organisation_name, user.first_name, user.last_name),
+            (User.Status.ACTIVE, "", "", "Anna", "Example"),
+        )
+
+    def test_a_person_registers_with_a_salutation_and_a_company_name(self):
+        data = completion_data(registration=self.token.pk, salutation="family", organisation_name="  Example AG ")
+
+        self.assertEqual(self.client.post(COMPLETE_URL, data).status_code, 302)
+
+        user = User.objects.get()
+        self.assertEqual(
+            (user.status, user.salutation, user.organisation_name, user.first_name, user.last_name),
+            (User.Status.ACTIVE, "family", "Example AG", "Anna", "Example"),
+        )
+
+    def test_a_company_registers_without_the_name_of_a_person(self):
+        data = completion_data(
+            registration=self.token.pk, salutation="", first_name="", last_name="", organisation_name="Example AG"
+        )
+
+        response = self.client.post(COMPLETE_URL, data, follow=True)
+
+        user = User.objects.get()
+        self.assertEqual(
+            (user.status, user.first_name, user.last_name, user.organisation_name, user.display_name),
+            (User.Status.ACTIVE, "", "", "Example AG", "Example AG"),
+        )
+        self.assertRegex(user.customer_number_id, r"^\d{6}$")
+        self.assertContains(response, "Guten Tag, Example AG")
+
+    def test_one_name_alone_is_refused_without_a_company_and_accepted_with_one(self):
+        for missing, message in (
+            ("first_name", "Geben Sie einen Vornamen oder einen Firmennamen ein."),
+            ("last_name", "Geben Sie einen Nachnamen oder einen Firmennamen ein."),
+        ):
+            with self.subTest(missing=missing):
+                data = completion_data(registration=self.token.pk, organisation_name="", **{missing: ""})
+                html = self.client.post(COMPLETE_URL, data).content.decode()
+                self.assertIn(message, html)
+                self.assertIn('aria-invalid="true"', element(html, f"id_{missing}"))
+                self.assertNotIn("Firmennamen ein.", html.replace(message, ""))
+                self.assertEqual(User.objects.get().status, User.Status.UNVERIFIED)
+        # White space is no name and no company.
+        data = completion_data(registration=self.token.pk, first_name="  ", last_name=" ", organisation_name="   ")
+        html = self.client.post(COMPLETE_URL, data).content.decode()
+        self.assertIn("Geben Sie einen Vornamen oder einen Firmennamen ein.", html)
+        self.assertEqual(User.objects.get().status, User.Status.UNVERIFIED)
+        # With a company one name is enough (the rule of the model).
+        data = completion_data(registration=self.token.pk, first_name="", organisation_name="Example AG")
+        self.assertEqual(self.client.post(COMPLETE_URL, data).status_code, 302)
+        self.assertEqual(User.objects.get().status, User.Status.ACTIVE)
+
+    def test_a_value_that_is_no_salutation_or_a_too_long_company_name_is_refused(self):
+        for overrides in ({"salutation": "dr"}, {"organisation_name": "x" * 61}):
+            with self.subTest(overrides=overrides):
+                data = completion_data(registration=self.token.pk, **overrides)
+                self.assertEqual(self.client.post(COMPLETE_URL, data).status_code, 200)
+                self.assertEqual(User.objects.get().status, User.Status.UNVERIFIED)
         # The address suggestions are offered here too (D-066): once, under the street input.
         self.assertEqual(self.html.count("data-address-directory"), 1)
         self.assertLess(self.html.index(' id="id_street"'), self.html.index("data-address-directory"))
@@ -164,19 +268,24 @@ class CompletionFormTests(TestCase):
         self.assertIn('id="id_town_error"', html)
         self.assertIn('aria-invalid="true"', element(html, "id_town"))
 
-    def test_the_names_and_the_street_are_required(self):
+    def test_the_names_and_the_street_are_required_without_a_company(self):
         data = completion_data(
             registration=self.token.pk, first_name="", last_name="", street=""
         )
 
         html = self.client.post(COMPLETE_URL, data).content.decode()
 
+        # The messages of the name rule of the model (``User.name_errors``), each under its own field.
         for text in (
-            "Geben Sie Ihren Vornamen ein.",
-            "Geben Sie Ihren Nachnamen ein.",
+            "Geben Sie einen Vornamen oder einen Firmennamen ein.",
+            "Geben Sie einen Nachnamen oder einen Firmennamen ein.",
             "Geben Sie Ihre Strasse ein.",
         ):
-            self.assertIn(text, html)
+            self.assertEqual(html.count(text), 1)
+        for field_id in ("id_first_name", "id_last_name"):
+            self.assertIn(f'id="{field_id}_error"', html)
+            self.assertIn(f'href="#{field_id}"', html)
+        self.assertNotIn('id="id_organisation_name_error"', html)
         self.assertEqual(User.objects.get().status, User.Status.UNVERIFIED)
 
     def test_the_house_number_may_stay_empty(self):
@@ -231,6 +340,22 @@ class ProfileFormTests(TestCase):
         self.assertIn("Weitere Angaben (optional)", html)
         self.assertIn("field-pair field-pair-street", html)
         self.assertIn("field-pair field-pair-locality", html)
+        # The salutation and the company name stand with the name, above the folded group, so that they are found.
+        with_name = [
+            html.index(' id="id_salutation"'),
+            html.index(' id="id_first_name"'),
+            html.index(' id="id_last_name"'),
+            html.index(' id="id_organisation_name"'),
+            html.index(' id="id_street"'),
+            html.index('<details class="more-details"'),
+            html.index(' id="id_address_line_1"'),
+        ]
+        self.assertEqual(with_name, sorted(with_name))
+        self.assertIn("Nur für Firmen. Vorname und Nachname dürfen dann leer bleiben.", html)
+        self.assertIn('aria-describedby="id_organisation_name_hint"', element(html, "id_organisation_name"))
+        # The empty salutation is a dash, not Django's row of dashes.
+        salutation = html[html.index('<select name="salutation"'):]
+        self.assertRegex(salutation[: salutation.index("</select>")], r'<option value=""[^>]*>–</option>')
         # The suggestions sit directly under the street input, before the house number; the notice
         # follows the postal code and town (D-065). A leading space: the widget also carries
         # data-...-id="id_..." attributes.

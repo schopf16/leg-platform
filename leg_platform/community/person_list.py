@@ -1,12 +1,13 @@
 """Queries and rules of the person list and of the metering points of one person (D-081). Pure query code.
 
-A person is an ``accounts.User`` with a customer number (D-077), or an invited person who has not completed the
+A person is an ``accounts.User`` with a customer number (D-077), or a person invited before 2026-11-19 who has not completed the
 registration (D-087, ``persons.person_filter``). Account states shown in the list:
 
 * **Active**: state ``active`` and not temporarily locked.
 * **Blocked**: state ``blocked``, or an active account held by the login lockout (``accounts.login_protection``).
 * **Inactive**: state ``deactivated`` (kept under the retention obligation); only with the filter "archived".
-* **Invited** (D-087): state ``unverified`` of a person invited by staff; no customer number yet. Only in "All".
+* **Invited** (D-087): state ``unverified`` of a person invited by staff before 2026-11-19; no customer number yet. Only in
+  "All"; staff create no new one.
 
 The metering points of a person are the non-archived ones with an assignment of this person that is valid now
 or starts later (``not_ended``). The word behind the count is "registered" if at least one is still registered

@@ -158,6 +158,13 @@ class PortalFormMixin:
                 widget.attrs.setdefault("autocomplete", AUTOCOMPLETE[name])
 
 
+def offer_salutation_and_company(form):
+    """The two voluntary fields beside the name: the empty salutation is a dash (as in the management area, not
+    Django's dashes), and the company name carries the hint of the name rule (``accounts/_company_field.html``)."""
+    form.fields["salutation"].choices = [("", "–"), *User.Salutation.choices]
+    form.fields["organisation_name"].described_by = ("hint",)
+
+
 def clean_postal_code(form, cleaned_data):
     """Write the postal code into the Swiss (Switzerland) or foreign (every other country) field; D-036."""
     if "country" not in cleaned_data or "postal_code" not in cleaned_data:
@@ -221,6 +228,7 @@ class ProfileForm(PortalFormMixin, forms.ModelForm):
         )
         self.fields["post_office_box_number"].described_by = ("hint",)
         self.fields["postal_code"].label = _("ZIP code")
+        offer_salutation_and_company(self)
 
     def _country_code(self):
         if self.is_bound:
@@ -331,8 +339,10 @@ class RegistrationPasswordForm(SetPasswordMixin, PortalFormMixin, forms.Form):
 class RegistrationDetailsForm(PortalFormMixin, forms.ModelForm):
     """Step 3 of the registration: name, address and consent to the privacy notice (D-058).
 
-    A person invited by staff (D-087) confirms or corrects the staff's data; an invitation with
-    another country keeps it (``country_of_instance``).
+    The salutation is voluntary. The name follows the rule of the model and nothing else (``User.name_errors``:
+    a first and a last name, or a company name; owner, 2026-11-16), so the form cannot differ from it. A person
+    invited by staff (D-087) confirms or corrects the staff's data; an invitation with another country keeps it
+    (``country_of_instance``).
     """
 
     postal_code = postal_code_field()
@@ -344,25 +354,30 @@ class RegistrationDetailsForm(PortalFormMixin, forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ("first_name", "last_name", "street", "house_number", "town")
+        fields = ("salutation", "first_name", "last_name", "organisation_name", "street", "house_number", "town")
 
-    field_order = ("first_name", "last_name", "street", "house_number", "postal_code", "town", "privacy")
+    field_order = (
+        "salutation", "first_name", "last_name", "organisation_name", "street", "house_number", "postal_code", "town",
+        "privacy",
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.initial.setdefault("postal_code", self.instance.postal_code_display)
         self.country = self.country_of_instance()
         for name, label, message in (
-            ("first_name", _("First name"), _("Enter your first name.")),
-            ("last_name", _("Last name"), _("Enter your last name.")),
             ("street", _("Street"), _("Enter your street.")),
             ("town", _("Town"), _("Enter a town.")),
         ):
             self.fields[name].required = True
             self.fields[name].label = label
             self.fields[name].error_messages["required"] = message
+        # Not required as fields: ``User.name_errors`` (run by ``_post_clean``) asks for them unless a company is named.
+        self.fields["first_name"].label = _("First name")
+        self.fields["last_name"].label = _("Last name")
         self.fields["house_number"].label = _("House number")
         self.fields["house_number"].required = False
+        offer_salutation_and_company(self)
         self.fields["postal_code"].label = _("Postal code")
         self.fields["postal_code"].required = True
         self.fields["postal_code"].error_messages["required"] = _("Enter a postal code.")

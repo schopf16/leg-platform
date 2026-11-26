@@ -1,9 +1,10 @@
 """The queryset and manager of the account model: bulk protection and the creation functions."""
 
+import secrets
+
 from django.contrib.auth import password_validation
 from django.contrib.auth.base_user import BaseUserManager
 from django.db import connections, models, router, transaction
-from django.utils import timezone
 
 from leg_platform.accounts.models.common import (
     EMAIL_MAX_LENGTH,
@@ -89,7 +90,7 @@ class UserManager(BaseUserManager.from_queryset(UserQuerySet)):
         }
     )
     # The profile data that staff enter when they create a person (D-087).
-    INVITATION_PROFILE_FIELDS = frozenset(
+    PERSON_PROFILE_FIELDS = frozenset(
         {
             "salutation",
             "first_name",
@@ -129,22 +130,26 @@ class UserManager(BaseUserManager.from_queryset(UserQuerySet)):
         user.save(using=self._db)
         return user
 
-    def create_invited_user(self, email, **profile):
-        """Create an unverified account for a person whom staff invite (D-087).
+    def create_person_account(self, email, **profile):
+        """Create the account of a person whom staff enter (D-087; owner 2026-11-19): complete and active at once.
 
-        Only ``INVITATION_PROFILE_FIELDS`` are accepted; the data is validated with the model
-        rules (``ValidationError``, nothing stored). ``invited_at`` marks the account; it has no
-        customer number (issued at the end of the registration) and no usable password.
+        Only ``PERSON_PROFILE_FIELDS`` are accepted; the data is validated with the model rules (``ValidationError``,
+        nothing stored). The person does nothing and gets no email: the account is made like any registration is
+        completed (``complete_registration``: active, customer number issued, D-021), with no privileges, groups or
+        ``invited_at``. Its password is a random secret that nobody sees or keeps (the rule "an active password
+        account has a usable password", D-034, stays): the person chooses one with "Forgot password". Call it in a
+        transaction that also records the History and the security event.
         """
         email = self._prepare(email, profile)
-        unknown = set(profile) - self.INVITATION_PROFILE_FIELDS
+        unknown = set(profile) - self.PERSON_PROFILE_FIELDS
         if unknown:
             raise ValueError(f"These fields cannot be set here: {', '.join(sorted(unknown))}.")
-        user = self.model(email=email, invited_at=timezone.now(), **profile)
+        user = self.model(email=email, **profile)
         user.set_unusable_password()
         user.full_clean(exclude=["password", "last_login"], validate_unique=False)
-        with user._account_change("invited_at"):
+        with transaction.atomic(using=self._db):
             user.save(using=self._db)
+            user.complete_registration(secrets.token_urlsafe(48))
         return user
 
     def create_superuser(self, email, password=None, **extra_fields):

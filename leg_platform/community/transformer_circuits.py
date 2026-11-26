@@ -72,3 +72,70 @@ def stats(circuit):
 def choices():
     """All circuits, ordered by number."""
     return list(TransformerCircuit.objects.order_by("grid_number"))
+
+
+def station_number(egid):
+    """The grid number ("TRA1024") of the transformer station the address directory holds for a building: "" when the
+    directory answered and holds none (or there is no EGID), None when the directory cannot answer now (missing, empty,
+    without building identifiers, unreadable, e.g. during an import). None must change nothing."""
+    if not egid:
+        return ""
+    from leg_platform.addresses.buildings import directory_answers
+    from leg_platform.addresses.transformers import station_of
+
+    try:
+        if not directory_answers():
+            return None
+        station = station_of(egid)
+    except Exception:  # noqa: BLE001  (the directory cannot be read now: nothing is derived or removed)
+        return None
+    if not station or not station.get("name"):
+        return ""
+    match = numbers.TRANSFORMER_CIRCUIT_NUMBER.search(station["name"].upper())
+    return match.group(0) if match else ""
+
+
+def derive(location, actor=None, *, clear_when_unavailable=False):
+    """Set the circuit of a location from its EGID (the station of the directory) unless it was set by hand.
+
+    Unknown station (the directory answered): a derived circuit is removed (the list shows "–"). The directory cannot
+    answer: nothing changes, unless ``clear_when_unavailable`` (the staff removed a hand choice: it goes, the scheduled
+    ``fill_transformer_circuits`` derives the circuit later). The caller holds the row lock. Returns True when the
+    circuit changed (saved, one History entry)."""
+    from . import history
+    from .history import HistoryEvent
+
+    if location.circuit_manual or location.is_archived:
+        return False
+    number = station_number(location.egid)
+    if number is None and not clear_when_unavailable:
+        return False
+    circuit = (find(number) or create(number)) if number else None
+    before = location.transformer_circuit
+    if before == circuit:
+        return False
+    location.transformer_circuit = circuit
+    location.save(update_fields=["transformer_circuit", "updated_at"])
+    history.record(
+        location, HistoryEvent.TRANSFORMER_CIRCUIT_CHANGED, actor,
+        {"old": before.grid_number if before else "", "new": circuit.grid_number if circuit else "", "derived": True},
+    )
+    return True
+
+
+def fill_missing():
+    """``derive`` for every open location that has no manual circuit, one transaction each; returns the number changed.
+
+    Stops at once, changing nothing, while the address directory cannot answer (command ``fill_transformer_circuits``,
+    a task of ``run_scheduled_tasks``)."""
+    from leg_platform.addresses.buildings import directory_answers
+
+    if not directory_answers():
+        return 0
+    changed = 0
+    for pk in Location.objects.filter(circuit_manual=False, is_archived=False).order_by("pk").values_list("pk", flat=True):
+        with transaction.atomic():
+            location = Location.objects.select_for_update().select_related("transformer_circuit").filter(pk=pk).first()
+            if location is not None and derive(location):
+                changed += 1
+    return changed

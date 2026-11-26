@@ -457,7 +457,11 @@ class SessionHardeningTests(TestCase):
             with self.subTest(field=name):
                 self.assertEqual(len(errors), 1, errors)
         html = response.content.decode()
-        for word in ("Firmenname", "Postfach", "zwingend erforderlich"):
+        # The company name is a voluntary field of this step (owner, 2026-11-16): its label may stand, an error of
+        # it may not (the empty form is valid for it).
+        self.assertNotIn("organisation_name", form.errors)
+        self.assertNotIn('id="id_organisation_name_error"', html)
+        for word in ("Postfach", "zwingend erforderlich"):
             self.assertNotIn(word, html)
         # The summary names the box by a short word (the checkbox has a long sentence as label).
         self.assertIn(">Datenschutzerklärung</a>", html)
