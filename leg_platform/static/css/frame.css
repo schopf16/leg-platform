@@ -1351,6 +1351,11 @@ body.has-render-as .corner {
   word-break: keep-all;
 }
 
+.mp-number-head {
+  color: var(--tblr-secondary, #6c7a91);
+  opacity: 0.75;
+}
+
 @media (max-width: 760px) {
   .mp-number {
     font-size: 0.86em;

@@ -404,6 +404,7 @@ class InPlaceMigrationTests(TransactionTestCase):
         for name in (
             "0020_lookup_tables_and_house_index", "0021_addressplace_centre",
             "0022_import_queue_and_published_figures", "0023_importrequest_worker_seen_at",
+            "0024_address_generation_egid_index",
         ):
             self.assertTrue(loader.get_migration("addresses", name).in_place, name)
         for name in ("0010_address_coordinates", "0019_importrequest_progress_units_and_more"):

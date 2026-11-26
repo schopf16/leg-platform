@@ -32,6 +32,7 @@ from leg_platform.community.tests.helpers import (
     make_location,
     make_metering_point,
     number,
+    number_markup,
     staff_user,
 )
 
@@ -118,7 +119,7 @@ class MeteringPointPageTests(TestCase):
         self.assertContains(page, "Dieser Messpunkt ist keiner LEG zugeordnet.")
         # The full number on one line with the direction, never cut or wrapped: the grid operator's block, then blocks of
         # four (D-109); the column widths have their handle.
-        self.assertContains(page, f'<span class="mp-number">{shown(5)}</span>')
+        self.assertContains(page, number_markup(number(5)))
         self.assertNotContains(page, "<wbr>")
         self.assertContains(page, 'class="mgmt-grip"')
         self.assertContains(page, 'name="leg"')  # the filter by LEG
@@ -396,7 +397,7 @@ class MeteringPointPageTests(TestCase):
         # in the field, and the way to create a missing person is under it (D-094).
         self.assertContains(page, f'data-suggest-url="{reverse("management:metering_points_person_search")}"')
         self.assertNotContains(page, "<datalist")
-        self.assertContains(page, "Person fehlt? Neue Person einladen")
+        self.assertContains(page, "Person fehlt? Neue Person anlegen")
         self.assertContains(page, "Name, Kundennummer oder E-Mail suchen")
         self.assertContains(page, "Person zuweisen</button>")
         # A text that names nobody or several, or a date that is not valid, is refused with a message.

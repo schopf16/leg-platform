@@ -3,6 +3,7 @@
 from datetime import date, timedelta
 
 from leg_platform.accounts.tests.helpers import create_active_user
+from leg_platform.community import numbers as number_format
 from leg_platform.community.models import (
     Direction,
     HistoryEntry,
@@ -18,6 +19,20 @@ from leg_platform.community.models import (
 )
 
 NUMBER_PREFIX = "CH1A2B3C4D5E6"  # country and identifier of the examples
+
+
+def number_markup(value):
+    """The markup of ``{{ number|metering_point }}`` (D-109) for a number: the grouped number in ``mp-number``, with the
+    grid operator's part and the leading zeros muted in ``mp-number-head``. The one place for the tests to change when
+    that markup changes (written out here, not rendered by the filter, so the tests still prove the whole number)."""
+    text = number_format.format_metering_point_number(value)
+    rest = text[number_format.HEAD_LENGTH:]
+    head = len(text) - len(rest.lstrip("0 \u00a0"))
+    if len(text) <= number_format.HEAD_LENGTH:
+        head = 0
+    if not head:
+        return f'<span class="mp-number">{text}</span>'
+    return f'<span class="mp-number"><span class="mp-number-head">{text[:head]}</span>{text[head:]}</span>'
 
 
 def number(last_digits):

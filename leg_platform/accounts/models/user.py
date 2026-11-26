@@ -111,8 +111,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     password_change_required = models.BooleanField(
         _("password change required"), default=False, editable=False
     )
-    # Set when staff created and invited the person (D-087); written only by
-    # ``UserManager.create_invited_user``; stays after the registration is completed.
+    # Set on a person whom staff invited before 2026-11-19 (D-087); no code writes it any more. Pending invitations
+    # are served until they are gone; the value stays after the registration is completed.
     invited_at = models.DateTimeField(_("invited at"), null=True, blank=True, editable=False)
     # Part of the session hash: raising it ends every session of the account (D-041).
     session_version = models.PositiveIntegerField(

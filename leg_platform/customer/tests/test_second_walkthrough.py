@@ -14,7 +14,7 @@ from django.utils import timezone, translation
 
 from leg_platform.accounts.tests.helpers import instance_mail_addresses
 from leg_platform.accounts.tests.helpers import PASSWORD
-from leg_platform.community import applications, contracts, deregistrations, numbers
+from leg_platform.community import applications, contracts, deregistrations
 from leg_platform.community.models import Application, GridOperator
 from leg_platform.customer.tests.helpers import (
     BUILDINGS,
@@ -22,6 +22,7 @@ from leg_platform.customer.tests.helpers import (
     START,
     candidate,
     configure_numbers,
+    number_markup,
     customer,
     directory,
     draft_with_building,
@@ -146,7 +147,7 @@ class SubmittedPageTests(TestCase):
         card = text(client.get(BUILDINGS))
         self.assertIn(wish.strftime("%d.%m.%Y"), card)
         for point in building.metering_points.all():
-            self.assertIn(numbers.format_metering_point_number(point.number), card)
+            self.assertIn(number_markup(point.number), card)
         self.assertNotIn("<progress", html)
 
 

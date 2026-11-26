@@ -6,7 +6,7 @@ To the login:
 
 {{ login_url }}
 
-If you do not know the password, you can request a new one on the login page.{% endblocktranslate %}
+If you have no password yet or do not know it, you can choose a new one on the login page with "Forgot password?".{% endblocktranslate %}
 {% if contact_url %}
 {% blocktranslate %}If that does not help, you will find contact information here:
 

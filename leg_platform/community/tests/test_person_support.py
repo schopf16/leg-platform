@@ -1,9 +1,11 @@
-"""Creating a person and the changes of the customer's data by the staff (D-087), at service level: the invitation (the
-account without password and customer number, the queued email, the link, the limits, the duplicates), the changes of
-the cards (only the fields of the card, the guards of the account model, the staff guard of D-012, the history and the
-security log with field names only), the IBAN stored encrypted, and the second email address through the existing
-confirmation mechanism. No client: the dialogs are in ``management/tests/test_person_data_pages.py``, the steps that the
-person takes in ``accounts/tests/test_invitations.py``."""
+"""Creating a person and the changes of the customer's data by the staff (D-087), at service level: the creation (an
+active account with a customer number, no email, the limits, the duplicates), the invitations of before 2026-11-19 that
+may still be pending (the queued email, the link, resend, expiry), the changes of the cards (only the fields of the
+card, the guards of the account model, the staff guard of D-012, the history and the security log with field names
+only), the IBAN stored encrypted, and the second email address through the existing confirmation mechanism. No client:
+the dialogs are in ``management/tests/test_person_data_pages.py``, the sign-in of a created person in
+``accounts/tests/test_person_creation.py``, the steps that an invited person takes in
+``accounts/tests/test_invitations.py``."""
 
 import re
 from datetime import timedelta
@@ -22,6 +24,7 @@ from leg_platform.accounts.encryption import DecryptionError
 from leg_platform.accounts.login_protection import axes_client_ip
 from leg_platform.accounts.models import AccountIntegrityError, MailJob, PendingEmailChange, SecurityEvent, VerificationToken
 from leg_platform.accounts.tests.helpers import create_active_user, run_mail_queue, verification_path
+from leg_platform.accounts.tests.legacy_invitation import invite_legacy_person
 from leg_platform.community import history, iban, person_list, persons
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import HistoryEntry, PersonRecord
@@ -44,6 +47,8 @@ def request_of(user):
 
 @tag("mariadb")
 class CreatePersonTests(TestCase):
+    """Staff create a person (D-087, owner 2026-11-19): active with a customer number at once, no email, nothing to do."""
+
     @classmethod
     def setUpTestData(cls):
         cls.staff = staff_user("staff.support@example.org")
@@ -57,36 +62,176 @@ class CreatePersonTests(TestCase):
     def create(self, email="neu.person@example.org", **values):
         return persons.create_person(self.staff, email, {**DATA, **values})
 
-    def test_a_person_is_created_without_password_customer_number_or_privileges_and_invited(self):
+    def test_a_person_is_created_active_with_a_customer_number_and_without_privileges_and_without_an_email(self):
         with self.assertLogs("leg_platform.security", "WARNING") as logs, self.captureOnCommitCallbacks(execute=True):
             person = self.create("  Neu.Person@Example.ORG ")
         person = User.objects.get(pk=person.pk)
-        self.assertEqual((person.email, person.status, person.is_active), ("neu.person@example.org", "unverified", False))
-        self.assertFalse(person.has_usable_password())
-        self.assertIsNone(person.customer_number_id)  # issued when the person completes the registration (D-021)
+        self.assertEqual((person.email, person.status, person.is_active), ("neu.person@example.org", "active", True))
+        self.assertRegex(person.customer_number_id, r"^\d{6}$")  # issued at once (D-021)
         self.assertEqual((person.is_staff, person.is_superuser, person.retention_obligation), (False, False, False))
         self.assertFalse(person.groups.exists() or person.user_permissions.exists())
-        self.assertIsNotNone(person.invited_at)
+        self.assertEqual(person.authentication_method, User.AuthenticationMethod.PASSWORD)
+        # No invitation and nothing to complete: no mark, no link, no job, no mail, no consent that nobody gave.
+        self.assertIsNone(person.invited_at)
+        self.assertIsNone(person.privacy_accepted_at)
+        self.assertFalse(VerificationToken.objects.filter(user=person).exists())
+        self.assertFalse(MailJob.objects.exists())
+        run_mail_queue()
+        self.assertEqual(mail.outbox, [])
         self.assertEqual((person.first_name, person.swiss_postal_code, person.phone_number.as_e164), ("Erika", 3000, "+41311234567"))
-        # It is a person of the list, with its own state, from the moment of its creation.
-        self.assertTrue(persons.person_queryset().filter(pk=person.pk).exists())
+        # It is a person of the list, active, from the moment of its creation.
         row = person_list.base_queryset().get(pk=person.pk)
-        self.assertEqual(person_list.account_state(row), person_list.AccountState.INVITED)
-        self.assertEqual(person_list.AccountState.INVITED.label, "Eingeladen")
+        self.assertEqual(person_list.account_state(row), person_list.AccountState.ACTIVE)
         # The history and the security log name the actor and the account, never a value.
-        self.assertEqual(
-            [(e.event, e.actor) for e in history.entries_for(person)],
-            [(HistoryEvent.CREATED, self.staff), (HistoryEvent.PERSON_INVITATION_SENT, self.staff)],
-        )
-        event = SecurityEvent.objects.get(event=SecurityEvent.Event.PERSON_INVITED)
-        self.assertEqual((event.account_id, event.actor_id), (person.pk, self.staff.pk))
+        self.assertEqual([(e.event, e.actor) for e in history.entries_for(person)], [(HistoryEvent.CREATED, self.staff)])
+        event = SecurityEvent.objects.get(event=SecurityEvent.Event.PERSON_CREATED)
+        self.assertEqual((event.account_id, event.actor_id, event.long_retention), (person.pk, self.staff.pk, True))
+        self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.PERSON_INVITED).exists())
         line = "\n".join(logs.output)
         self.assertIn(f"account {person.pk}", line)
         self.assertIn(f"actor {self.staff.pk}", line)
         for secret in ("Erika", "Neu", "Neuweg", "neu.person", "1234567"):
             self.assertNotIn(secret, line)
 
-    def test_the_invitation_mark_is_a_controlled_field_that_nothing_but_the_creation_writes(self):
+    def test_the_password_is_a_secret_that_nobody_knows(self):
+        first = self.create("first.person@example.org")
+        second = self.create("second.person@example.org")
+        first, second = User.objects.get(pk=first.pk), User.objects.get(pk=second.pk)
+        self.assertNotEqual(first.password, second.password)
+        for guess in ("", "password", DATA["first_name"], first.email, first.customer_number_id):
+            self.assertFalse(first.check_password(guess))
+
+    def test_the_creation_is_a_guarded_write_of_the_account_logic(self):
+        """D-034: the status and the number come from the account methods; a stale save or a bulk update cannot set them."""
+        person = self.create()
+        stale = User.objects.get(pk=person.pk)
+        stale.invited_at = timezone.now()
+        with self.assertRaises(AccountIntegrityError):
+            stale.save()
+        with self.assertRaises(AccountIntegrityError):
+            User.objects.filter(pk=person.pk).update(invited_at=timezone.now())
+        with self.assertRaises(AccountIntegrityError):
+            User.objects.filter(pk=person.pk).update(customer_number="111111", status="active")
+        self.assertIsNone(User.objects.get(pk=person.pk).invited_at)
+
+    def test_only_a_staff_account_creates_a_person(self):
+        for actor in (self.plain, self.gone, self.blocked, None):
+            with self.subTest(actor=getattr(actor, "email", None)):
+                with self.assertRaises(persons.PersonError) as caught:
+                    persons.create_person(actor, "x.person@example.org", DATA)
+                self.assertEqual(caught.exception.code, "not_allowed")
+        # The staff status is read from the database: an object that still says "staff" after the demotion is no use.
+        stale = User.objects.get(pk=self.staff.pk)
+        self.staff.set_privileges(is_staff=False, is_superuser=False)
+        with self.assertRaises(persons.PersonError):
+            persons.create_person(stale, "y.person@example.org", DATA)
+        self.assertFalse(User.objects.filter(email__in=("x.person@example.org", "y.person@example.org")).exists())
+        self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.PERSON_CREATED).exists())
+
+    def test_the_account_logic_accepts_only_the_profile_data_and_never_a_privilege(self):
+        for forbidden in ("is_staff", "is_superuser", "status", "customer_number", "retention_obligation", "invited_at",
+                          "password", "groups", "title", "secondary_email", "authentication_method"):
+            with self.subTest(field=forbidden):
+                with self.assertRaises(ValueError):
+                    User.objects.create_person_account("forbidden.person@example.org", **{**DATA, forbidden: True})
+        # The plain way of creating an account cannot mark an invitation either.
+        with self.assertRaises(ValueError):
+            User.objects.create_user("forbidden.person@example.org", invited_at=timezone.now())
+        self.assertFalse(User.objects.filter(email="forbidden.person@example.org").exists())
+
+    def test_the_data_follows_the_account_rules_and_nothing_is_created_otherwise(self):
+        before = User.objects.count()
+        for bad in (
+            {"first_name": "", "last_name": ""},  # a name or a company
+            {"street": "", "post_office_box_number": None},  # a street or a post office box
+            {"town": ""},
+            {"swiss_postal_code": 99},  # four digits from 1000
+            {"country": "DE", "swiss_postal_code": 3000},  # a foreign address has the foreign postal code
+            {"phone_number": "123"},
+            {"first_name": "x" * 31},
+        ):
+            with self.subTest(bad=bad), self.assertRaises(ValidationError):
+                self.create("bad.person@example.org", **bad)
+        self.assertEqual(User.objects.count(), before)
+        self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.PERSON_CREATED).exists())
+        # A company without a contact person, a post office box instead of a street and a foreign address are valid.
+        self.create("company.person@example.org", organisation_name="Beispiel AG", first_name="", last_name="")
+        self.create("box.person@example.org", street="", house_number="", post_office_box_number=17)
+        self.create("abroad.person@example.org", country="DE", swiss_postal_code=None, foreign_postal_code="10115")
+        with self.assertRaises(persons.PersonError) as caught:
+            self.create("not an address")
+        self.assertEqual(caught.exception.code, "email_invalid")
+
+    def test_an_address_in_use_is_refused_without_telling_anything_about_the_other_account(self):
+        for account in (self.active, self.blocked, self.staff):
+            with self.subTest(account=account.email), self.assertRaises(persons.PersonError) as caught:
+                self.create(account.email.upper())
+            self.assertEqual(str(caught.exception), "email_in_use")
+        created = self.create("created.person@example.org")
+        with self.assertRaises(persons.PersonError) as caught:
+            self.create("created.person@example.org")
+        self.assertEqual(caught.exception.code, "email_in_use")
+        self.assertEqual(User.objects.filter(email="created.person@example.org").count(), 1)
+        self.assertEqual(User.objects.get(pk=created.pk).customer_number_id, created.customer_number_id)
+        # A pending invitation of before 2026-11-19 holds its address too.
+        invite_legacy_person(self.staff, "invited.person@example.org", DATA)
+        with self.assertRaises(persons.PersonError) as caught:
+            self.create("invited.person@example.org")
+        self.assertEqual(caught.exception.code, "email_in_use")
+        # An address that only a deactivated account had is free (D-016); a pending self-registration does not hold it.
+        self.create(self.gone.email)
+        pending = User.objects.create_user("pending.person@example.org")
+        replaced = self.create("pending.person@example.org")
+        self.assertFalse(User.objects.filter(pk=pending.pk).exists())
+        self.assertEqual(User.objects.get(pk=replaced.pk).status, "active")
+
+    def test_the_limit_per_staff_account_applies_and_a_refusal_leaves_nothing_behind(self):
+        with patch.object(rate_limits, "PERSON_CREATION_LIMITS", ((1, timedelta(hours=1)),)):
+            self.create("first.person@example.org")
+            with self.assertRaises(persons.PersonError) as caught:
+                self.create("second.person@example.org")
+            # Another staff account has its own budget.
+            persons.create_person(staff_user("other.staff@example.org"), "third.person@example.org", DATA)
+        self.assertEqual(caught.exception.code, "rate_limited")
+        self.assertFalse(User.objects.filter(email="second.person@example.org").exists())
+        self.assertEqual(SecurityEvent.objects.filter(event=SecurityEvent.Event.PERSON_CREATED).count(), 2)
+        self.assertEqual(HistoryEntry.objects.filter(subject_type="person", event=HistoryEvent.CREATED).count(), 2)
+        self.assertFalse(MailJob.objects.exists())
+        # A refused creation does not replace a pending self-registration either.
+        pending = User.objects.create_user("pending.limit@example.org")
+        with patch.object(rate_limits, "PERSON_CREATION_LIMITS", ((1, timedelta(hours=1)),)):
+            with self.assertRaises(persons.PersonError):
+                self.create("pending.limit@example.org")
+        self.assertTrue(User.objects.filter(pk=pending.pk).exists())
+
+
+@tag("mariadb")
+class PendingInvitationTests(TestCase):
+    """The invitations of before 2026-11-19 that may still be pending: email, link, resend, expiry (D-087, D-016)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = staff_user("staff.invitation@example.org")
+        cls.plain = create_active_user("plain.invitation@example.org")
+        cls.active = create_active_user("active.invitation@example.org")
+        cls.blocked = create_active_user("blocked.invitation@example.org")
+        cls.blocked.set_status(User.Status.BLOCKED)
+
+    def create(self, email="neu.person@example.org", **values):
+        return invite_legacy_person(self.staff, email, {**DATA, **values})
+
+    def test_a_pending_invitation_has_no_password_customer_number_or_privileges_and_is_listed_as_invited(self):
+        person = User.objects.get(pk=self.create().pk)
+        self.assertEqual((person.status, person.is_active), ("unverified", False))
+        self.assertFalse(person.has_usable_password())
+        self.assertIsNone(person.customer_number_id)
+        self.assertIsNotNone(person.invited_at)
+        self.assertTrue(persons.person_queryset().filter(pk=person.pk).exists())
+        row = person_list.base_queryset().get(pk=person.pk)
+        self.assertEqual(person_list.account_state(row), person_list.AccountState.INVITED)
+        self.assertEqual(person_list.AccountState.INVITED.label, "Eingeladen")
+
+    def test_the_invitation_mark_is_a_controlled_field_that_no_save_or_update_writes(self):
         """L-1: like the status or the rights, it cannot be changed by a save, a bulk update or a plain creation."""
         person = self.create()
         stale = User.objects.get(pk=person.pk)
@@ -108,87 +253,16 @@ class CreatePersonTests(TestCase):
         again.save()
         self.assertIsNotNone(User.objects.get(pk=person.pk).invited_at)
 
-    def test_only_a_staff_account_creates_a_person(self):
-        for actor in (self.plain, self.gone, self.blocked, None):
-            with self.subTest(actor=getattr(actor, "email", None)):
-                with self.assertRaises(persons.PersonError) as caught:
-                    persons.create_person(actor, "x.person@example.org", DATA)
-                self.assertEqual(caught.exception.code, "not_allowed")
-        # The staff status is read from the database: an object that still says "staff" after the demotion is no use.
-        stale = User.objects.get(pk=self.staff.pk)
-        self.staff.set_privileges(is_staff=False, is_superuser=False)
-        with self.assertRaises(persons.PersonError):
-            persons.create_person(stale, "y.person@example.org", DATA)
-        self.assertFalse(User.objects.filter(email__in=("x.person@example.org", "y.person@example.org")).exists())
-
-    def test_the_account_logic_accepts_only_the_registration_data_and_never_a_privilege(self):
-        for forbidden in ("is_staff", "is_superuser", "status", "customer_number", "retention_obligation", "invited_at",
-                          "password", "groups", "title", "secondary_email"):
-            with self.subTest(field=forbidden):
-                with self.assertRaises(ValueError):
-                    User.objects.create_invited_user("forbidden.person@example.org", **{**DATA, forbidden: True})
-        # The plain way of creating an account cannot mark an invitation either.
-        with self.assertRaises(ValueError):
-            User.objects.create_user("forbidden.person@example.org", invited_at=timezone.now())
-        self.assertFalse(User.objects.filter(email="forbidden.person@example.org").exists())
-
-    def test_the_data_follows_the_rules_of_the_registration_and_nothing_is_created_otherwise(self):
-        before = User.objects.count()
-        for bad in (
-            {"first_name": "", "last_name": ""},  # a name or a company
-            {"street": "", "post_office_box_number": None},
-            {"town": ""},
-            {"swiss_postal_code": 99},  # four digits from 1000
-            {"country": "DE", "swiss_postal_code": 3000},  # a foreign address has the foreign postal code
-            {"phone_number": "123"},
-            {"first_name": "x" * 31},
-        ):
-            with self.subTest(bad=bad), self.assertRaises(ValidationError):
-                self.create("bad.person@example.org", **bad)
-        self.assertEqual(User.objects.count(), before)
-        # A company without a contact person is valid; a foreign address with its postal code too.
-        self.create("company.person@example.org", organisation_name="Beispiel AG", first_name="", last_name="")
-        self.create("abroad.person@example.org", country="DE", swiss_postal_code=None, foreign_postal_code="10115")
-        with self.assertRaises(persons.PersonError) as caught:
-            self.create("not an address")
-        self.assertEqual(caught.exception.code, "email_invalid")
-
-    def test_an_address_in_use_is_refused_without_telling_anything_about_the_other_account(self):
-        for account in (self.active, self.blocked, self.staff):
-            with self.subTest(account=account.email), self.assertRaises(persons.PersonError) as caught:
-                self.create(account.email.upper())
-            self.assertEqual(str(caught.exception), "email_in_use")
-        invited = self.create("invited.person@example.org")
-        with self.assertRaises(persons.PersonError) as caught:
-            self.create("invited.person@example.org")
-        self.assertEqual(caught.exception.code, "email_in_use")
-        self.assertEqual(User.objects.filter(email="invited.person@example.org").count(), 1)
-        self.assertEqual(MailJob.objects.filter(account=invited).count(), 1)
-        # An address that only a deactivated account had is free (D-016); a pending self-registration does not hold it.
-        self.create(self.gone.email)
-        pending = User.objects.create_user("pending.person@example.org")
-        replaced = self.create("pending.person@example.org")
-        self.assertFalse(User.objects.filter(pk=pending.pk).exists())
-        self.assertIsNotNone(User.objects.get(pk=replaced.pk).invited_at)
-
-    def test_the_limits_apply_and_a_refusal_leaves_nothing_behind(self):
-        with patch.object(rate_limits, "INVITATION_ACTOR_LIMITS", ((1, timedelta(hours=1)),)):
-            self.create("first.person@example.org")
-            with self.assertRaises(persons.PersonError) as caught:
-                self.create("second.person@example.org")
-        self.assertEqual(caught.exception.code, "rate_limited")
-        self.assertFalse(User.objects.filter(email="second.person@example.org").exists())
-        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.INVITATION).count(), 1)
-        self.assertFalse(HistoryEntry.objects.filter(subject_type="person").exclude(actor=self.staff).exists())
-        # The limit of the address is the one of every email (three in ten minutes); no limit of the client address.
-        person = User.objects.get(email="first.person@example.org")
-        self.assertEqual(rate_limits.MAIL_IP_LIMITS, ((20, timedelta(hours=1)),))
+    def test_the_limits_of_a_resend_apply(self):
+        person = self.create()
         with patch.object(rate_limits, "INVITATION_ACCOUNT_LIMITS", ((1000, timedelta(seconds=1)),)):
             for _ in range(2):
                 persons.resend_invitation(person, self.staff)
             with self.assertRaises(persons.PersonError) as caught:
                 persons.resend_invitation(person, self.staff)
         self.assertEqual(caught.exception.code, "rate_limited")
+        # The limit of the address is the one of every email (three in ten minutes); no limit of the client address.
+        self.assertEqual(rate_limits.MAIL_IP_LIMITS, ((20, timedelta(hours=1)),))
 
     def test_the_worker_sends_one_neutral_email_with_a_link_that_is_valid_for_seven_days(self):
         person = self.create()
@@ -402,7 +476,7 @@ class ChangeCustomerDataTests(TestCase):
         persons.update_customer_data(self.blocked, persons.GROUP_DETAILS, {"first_name": "Ruth", "last_name": "Gesperrt"}, self.staff)
 
     def test_a_person_who_was_invited_can_be_corrected_before_the_registration_is_completed(self):
-        invited = persons.create_person(self.staff, "invited.change@example.org", {
+        invited = invite_legacy_person(self.staff, "invited.change@example.org", {
             "first_name": "Erika", "last_name": "Neu", "street": "Neuweg", "house_number": "3",
             "swiss_postal_code": 3000, "town": "Bern", "country": "CH",
         })

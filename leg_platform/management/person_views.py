@@ -352,7 +352,7 @@ class PersonDetailView(PersonObjectMixin, ManagementAccessMixin, View):
                 for entry in history.entries_for(person).order_by("-created_at", "-pk")
             ],
             "back_url": return_url(request, reverse("management:persons")),
-            # A back link that leads to another page than the list (the dialog the person was invited from) is neutral.
+            # A back link that leads to another page than the list (the dialog the person was created from) is neutral.
             "back_is_origin": return_url(request, reverse("management:persons")) != reverse("management:persons"),
             "current_url": request.get_full_path(),
             "show_new": request.GET.get("new") == "1",
@@ -563,13 +563,14 @@ class PersonContactView(CustomerDataDialog):
 
 
 class PersonCreateView(DialogView):
-    """"Person anlegen" (D-087): the person gets an email with a link to confirm the address and choose a password,
-    and is listed as "Invited". Afterwards the page of the person opens with the next step (D-095); from another page
-    (the dialog "Assign person") the person goes back there."""
+    """"Person anlegen" (D-087, owner 2026-11-19): the person is active with a customer number at once, gets no email and
+    has nothing to do. Afterwards the page of the person opens with the next step (D-095); from another page (the dialog
+    "Assign person") the person goes back there."""
 
     title = gettext_lazy("Create person")
     lead = gettext_lazy(
-        "The person receives an email with a link to confirm the email address and to choose a password."
+        "The person gets no email and has nothing to do. To sign in, the person chooses a password with "
+        "\"Forgot password?\" on the login page."
     )
     submit_label = gettext_lazy("Create person")
     form_class = PersonCreateForm
@@ -585,12 +586,12 @@ class PersonCreateView(DialogView):
         ):
             return None
         back = self.back(request)
-        # From the dialog "Assign person" the person goes to the page of the new person too (an invited person cannot be
-        # assigned yet) and comes back to the dialog from there.
+        # From the dialog "Assign person" the person goes to the page of the new person too (its banner leads back to the
+        # metering point).
         list_view = "management:metering_points_person" if view_name_of(back) == "management:metering_points_person" else "management:persons"
         return created_redirect(
             request, list_view, back, reverse("management:persons_detail", args=[created[0].pk]),
-            _("The person was created and the invitation was sent."),
+            _("The person was created."),
         )
 
 

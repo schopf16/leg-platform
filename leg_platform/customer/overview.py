@@ -460,6 +460,11 @@ def build(person, today=None):
         TransformerStation.objects.filter(egid__in=[card.egid for card in result if card.egid]).values_list("egid", "name")
     )
     for card in result:
+        location = card.location
+        if location is not None and location.circuit_manual and location.transformer_circuit_id:
+            # The staff chose the circuit by hand: that choice is shown everywhere.
+            card.transformer = location.transformer_circuit.grid_number
+            continue
         if card.egid:
             card.transformer = transformers.get(card.egid, "")
             continue

@@ -464,3 +464,35 @@ class BannerAndHeaderTests(ViewAsBase):
     def test_the_bar_is_gone_after_the_end(self):
         self.client.post(END)
         self.assertNotContains(self.client.get(PROFILE), BANNER)
+
+
+class ProfileRowsTests(ViewAsBase):
+    """The reduced profile mirrors the read state of the card "Personal details" (salutation, name, company name)."""
+
+    def rows(self, person):
+        self.start(person)
+        html = self.client.get(PROFILE).content.decode()
+        card = html[html.index('aria-labelledby="card-personal-title"'):]
+        card = card[: card.index("</section>")]
+        return re.findall(r'<div class="profile-row"><dt>(.*?)</dt><dd>(.*?)</dd></div>', card, re.S)
+
+    def test_the_salutation_and_the_company_of_a_person_are_shown(self):
+        person = customer(
+            "view.as.company.person@example.org", salutation="mr", organisation_name="Beispiel AG"
+        )
+        self.assertEqual(
+            self.rows(person)[:3], [("Anrede", "Herr"), ("Name", "Anna Example"), ("Firmenname", "Beispiel AG")]
+        )
+
+    def test_a_company_without_a_personal_name_is_shown_once_and_no_empty_salutation(self):
+        company = customer(
+            "view.as.company@example.org", first_name="", last_name="", organisation_name="Beispiel AG"
+        )
+        rows = self.rows(company)
+        self.assertEqual(rows[0], ("Name", "Beispiel AG"))
+        self.assertNotIn("Anrede", [label for label, _value in rows])
+        self.assertNotIn("Firmenname", [label for label, _value in rows])
+
+    def test_a_person_without_both_has_neither_row(self):
+        labels = [label for label, _value in self.rows(self.person)]
+        self.assertEqual(labels[:2], ["Name", "Adresse"])

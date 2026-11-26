@@ -44,8 +44,6 @@ the way to the detail page is the link at the right, DESIGN section 6) and the s
 
   <form id="expand-form" method="post" action="{{ expand_url }}">{% csrf_token %}<input type="hidden" name="next" value="{{ current_url }}"></form>
 
-  {% include "management/_pending_locations.html" %}
-
   <div class="mgmt-list" data-list data-list-key="{{ list_key }}" data-widths-url="{{ list_widths_url }}" data-expand-url="{{ expand_url }}" data-csrf="{{ csrf_token }}" data-min-width="90">
     <div class="mgmt-table-view mgmt-list-card">
       <table class="mgmt-table mgmt-table-fixed">
@@ -58,14 +56,22 @@ the way to the detail page is the link at the right, DESIGN section 6) and the s
                 <div class="mgmt-addr mgmt-cut" title="{{ location.street }} {{ location.house_number }}">
                   {% if entry.can_open %}<button type="submit" form="expand-form" name="toggle" value="{{ location.pk }}" class="mgmt-caret" aria-label="{% translate 'Show or hide the metering points' %}" aria-expanded="{% if entry.is_open %}true{% else %}false{% endif %}" aria-controls="points-table-{{ location.pk }}" data-expand-toggle><span class="mgmt-caret-icon" aria-hidden="true"></span></button>{% else %}<span class="mgmt-caret-space"></span>{% endif %}
                   <span class="mgmt-addr-name">{{ location.street }} {{ location.house_number }}</span>
+                  {% if entry.pending %}<span class="mgmt-new">{% translate "In registration" %}</span> <a class="btn btn-secondary-action btn-xs mgmt-pending-edit" href="{{ entry.edit_url }}">{% translate "Edit address" %}<span class="visually-hidden"> {{ location.street }} {{ location.house_number }}</span></a>{% endif %}
                   {% if location.needs_confirmation %}<span class="mgmt-new">{% translate "new" %}</span>{% endif %}
                   {% if location.address_correction_open %}{% translate "Problem: Address correction open" as problem_text %}{% include "management/_warning.html" with text=problem_text %}{% endif %}
                 </div>
               </td>
-              <td class="mgmt-cut" title="{{ entry.circuit }}">{{ entry.circuit }}</td>
-              <td>{{ entry.count_phrase }}</td>
-              <td>{{ entry.occupancy }}</td>
-              <td class="mgmt-link-col">{% translate "Go to the details of the location" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label %}</td>
+              {% if entry.pending %}
+                <td class="mgmt-cut" title="{{ entry.circuit }}">{{ entry.circuit }}</td>
+                <td>{{ entry.count_phrase }}</td>
+                <td><a href="{{ entry.applicant_url }}">{{ entry.occupancy }}</a></td>
+                <td class="mgmt-link-col">{% translate "Go to the registration" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label %}</td>
+              {% else %}
+                <td class="mgmt-cut" title="{{ entry.circuit }}">{{ entry.circuit }}</td>
+                <td>{{ entry.count_phrase }}</td>
+                <td>{{ entry.occupancy }}</td>
+                <td class="mgmt-link-col">{% translate "Go to the details of the location" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label %}</td>
+              {% endif %}
             </tr>
             {% if entry.can_open %}
               <tr class="mgmt-subwrap" id="points-table-{{ location.pk }}" data-expand-for="{{ location.pk }}"{% if not entry.is_open %} hidden{% endif %}>
@@ -82,12 +88,21 @@ the way to the detail page is the link at the right, DESIGN section 6) and the s
                     </thead>
                     <tbody>
                       {% for row in entry.points %}
+                        {% if row.pending %}
+                        <tr class="is-pending">
+                          <td><div class="mgmt-nr-row"><span class="mgmt-nr">{{ row.number|metering_point }}</span>{% include "management/_direction.html" with direction=row.direction %}</div></td>
+                          <td><span class="mgmt-muted">–</span></td>
+                          <td>{% include "management/_status.html" with tone="accent" label=row.state %}</td>
+                          <td><span class="mgmt-cut-inline" title="{{ row.applicant }}">{{ row.applicant }}</span>{% translate "Go to the person" as person_label %}{% include "management/_goto.html" with url=row.applicant_url label=person_label %} <a class="btn btn-secondary-action btn-xs" href="{{ row.edit_url }}">{% translate "Edit" %}<span class="visually-hidden"> {{ row.number|metering_point_text }}</span></a></td>
+                        </tr>
+                        {% else %}
                         <tr>
                           <td><div class="mgmt-nr-row">{% if row.metering_point.number %}<span class="mgmt-nr">{{ row.metering_point.number|metering_point }}</span>{% else %}<span class="mgmt-muted">–</span>{% endif %}{% include "management/_direction.html" with direction=row.metering_point.direction %}</div></td>
                           <td>{% if row.leg_id %}<span class="mgmt-leg mgmt-cut-inline" title="{{ row.leg_name }}">{{ row.leg_name }}</span>{% url "management:legs_detail" row.leg_id as leg_url %}{% translate "Go to the LEG page" as leg_label %}{% include "management/_goto.html" with url=leg_url label=leg_label %}{% else %}{% translate "no LEG" as missing_leg %}{% include "management/_missing.html" with text=missing_leg %}{% endif %}</td>
                           <td>{% include "management/_status.html" with tone=row.status|status_tone label=row.status|status_label %}</td>
                           <td>{% if row.person_id %}<span class="mgmt-cut-inline" title="{{ row.person_name }}">{{ row.person_name }}</span>{% url "management:persons_detail" row.person_id as person_url %}{% translate "Go to the person" as person_label %}{% include "management/_goto.html" with url=person_url label=person_label %}{% else %}{% translate "no person" as missing_person %}{% include "management/_missing.html" with text=missing_person %}{% endif %}</td>
                         </tr>
+                        {% endif %}
                       {% endfor %}
                     </tbody>
                   </table>
@@ -110,14 +125,22 @@ the way to the detail page is the link at the right, DESIGN section 6) and the s
           <div class="mgmt-place-addr">
             {% if entry.can_open %}<button type="submit" form="expand-form" name="toggle" value="{{ location.pk }}" class="mgmt-caret" aria-label="{% translate 'Show or hide the metering points' %}" aria-expanded="{% if entry.is_open %}true{% else %}false{% endif %}" aria-controls="points-card-{{ location.pk }}" data-expand-toggle><span class="mgmt-caret-icon" aria-hidden="true"></span></button>{% endif %}
             <span class="mgmt-addr-name">{{ location.street }} {{ location.house_number }}</span>
+            {% if entry.pending %}<span class="mgmt-new">{% translate "In registration" %}</span> <a class="btn btn-secondary-action btn-xs mgmt-pending-edit" href="{{ entry.edit_url }}">{% translate "Edit address" %}<span class="visually-hidden"> {{ location.street }} {{ location.house_number }}</span></a>{% endif %}
             {% if location.needs_confirmation %}<span class="mgmt-new">{% translate "new" %}</span>{% endif %}
             {% if location.address_correction_open %}{% translate "Problem: Address correction open" as problem_text %}{% include "management/_warning.html" with text=problem_text %}{% endif %}
-            {% translate "Go to the details of the location" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label %}
+            {% if entry.pending %}{% translate "Go to the registration" as goto_label %}{% else %}{% translate "Go to the details of the location" as goto_label %}{% endif %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label %}
           </div>
-          <div class="mgmt-place-sub">{{ entry.circuit }} · {{ entry.count_phrase }} · {{ entry.occupancy }}</div>
+          <div class="mgmt-place-sub">{% if entry.pending %}{{ entry.circuit }} · {{ entry.count_phrase }} · <a href="{{ entry.applicant_url }}">{{ entry.occupancy }}</a>{% else %}{{ entry.circuit }} · {{ entry.count_phrase }} · {{ entry.occupancy }}{% endif %}</div>
           {% if entry.can_open %}
             <div class="mgmt-place-points" id="points-card-{{ location.pk }}" data-expand-for="{{ location.pk }}"{% if not entry.is_open %} hidden{% endif %}>
               {% for row in entry.points %}
+                {% if row.pending %}
+                <div class="mgmt-mp">
+                  <div class="mgmt-mp-nr">{{ row.number|metering_point }}{% include "management/_direction.html" with direction=row.direction %}</div>
+                  <div class="mgmt-mp-line"><span>–</span>{% include "management/_status.html" with tone="accent" label=row.state %}</div>
+                  <div class="mgmt-mp-person">{{ row.applicant }}{% translate "Go to the person" as person_label %}{% include "management/_goto.html" with url=row.applicant_url label=person_label %} <a class="btn btn-secondary-action btn-xs" href="{{ row.edit_url }}">{% translate "Edit" %}</a></div>
+                </div>
+                {% else %}
                 <div class="mgmt-mp">
                   <div class="mgmt-mp-nr">{% if row.metering_point.number %}{{ row.metering_point.number|metering_point }}{% else %}–{% endif %}{% include "management/_direction.html" with direction=row.metering_point.direction %}</div>
                   <div class="mgmt-mp-line">
@@ -126,6 +149,7 @@ the way to the detail page is the link at the right, DESIGN section 6) and the s
                   </div>
                   <div class="mgmt-mp-person">{% if row.person_id %}{{ row.person_name }}{% url "management:persons_detail" row.person_id as person_url %}{% translate "Go to the person" as person_label %}{% include "management/_goto.html" with url=person_url label=person_label %}{% else %}{% translate "no person" as missing_person %}{% include "management/_missing.html" with text=missing_person %}{% endif %}</div>
                 </div>
+                {% endif %}
               {% endfor %}
             </div>
           {% endif %}
@@ -136,6 +160,8 @@ the way to the detail page is the link at the right, DESIGN section 6) and the s
       {% endfor %}
     </div>
   </div>
+
+  {% if pending_more %}<p class="mgmt-hint mgmt-list-notice"><a href="{{ pending_more.url }}">{{ pending_more.text }}</a></p>{% endif %}
 
   {% include "management/_list_foot.html" %}
 {% endblock %}

@@ -32,8 +32,6 @@ the form on change.
     <noscript><button type="submit" class="btn btn-secondary-action">{% translate "Apply" %}</button></noscript>
   </form>
 
-  {% include "management/_pending_points.html" %}
-
   <div class="mgmt-list" data-list data-list-key="{{ list_key }}" data-widths-url="{{ list_widths_url }}" data-csrf="{{ csrf_token }}" data-min-width="90">
     <div class="mgmt-table-view mgmt-list-card">
       <table class="mgmt-table mgmt-table-fixed">
@@ -41,10 +39,24 @@ the form on change.
         <tbody>
           {% for entry in entries %}
             {% with point=entry.point %}
+            {% if entry.pending %}
+            <tr class="is-pending">
+              <td>
+                <div class="mgmt-nr-row">
+                  <a class="mgmt-row-link mgmt-nr" href="{{ entry.edit_url }}">{{ point.number|metering_point_short }}</a>
+                  {% include "management/_direction.html" with direction=point.direction %}
+                </div>
+              </td>
+              <td><span class="mgmt-cut-inline" title="{{ entry.address }}">{{ entry.address }}</span>{% if entry.location_url %}{% translate "Go to the location" as location_label %}{% include "management/_goto.html" with url=entry.location_url label=location_label %}{% endif %}</td>
+              <td><span class="mgmt-muted">–</span></td>
+              <td class="mgmt-cut" title="{{ entry.state }} · {{ entry.applicant }}"><span class="mgmt-new mgmt-new-first">{% translate "In registration" %}</span> <span class="mgmt-muted">{{ entry.state }}</span></td>
+              <td class="mgmt-link-col">{% translate "Go to the registration" as goto_label %}{% include "management/_goto.html" with url=entry.application_url label=goto_label %}</td>
+            </tr>
+            {% else %}
             <tr>
               <td>
                 <div class="mgmt-nr-row">
-                  {% if point.number %}<a class="mgmt-row-link mgmt-nr" href="{{ entry.detail_url }}">{{ point.number|metering_point }}</a>{% else %}<a class="mgmt-row-link mgmt-muted" href="{{ entry.detail_url }}">–</a>{% endif %}
+                  {% if point.number %}<a class="mgmt-row-link mgmt-nr" href="{{ entry.detail_url }}">{{ point.number|metering_point_short }}</a>{% else %}<a class="mgmt-row-link mgmt-muted" href="{{ entry.detail_url }}">–</a>{% endif %}
                   {% include "management/_direction.html" with direction=point.direction %}
                   {% if entry.problem_text %}{% include "management/_warning.html" with text=entry.problem_text %}{% endif %}
                 </div>
@@ -62,6 +74,7 @@ the form on change.
               </td>
               <td class="mgmt-link-col">{% translate "Go to the details of the metering point" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label %}</td>
             </tr>
+            {% endif %}
             {% endwith %}
           {% empty %}
             {% include "management/_empty_row.html" with colspan=5 text=empty_text %}
@@ -73,6 +86,19 @@ the form on change.
     <div class="mgmt-cards-view">
       {% for entry in entries %}
         {% with point=entry.point %}
+        {% if entry.pending %}
+        <article class="mgmt-place is-pending">
+          <div class="mgmt-mp-nr mgmt-point-nr">
+            <a class="mgmt-row-link" href="{{ entry.edit_url }}">{{ point.number|metering_point }}</a>
+            {% include "management/_direction.html" with direction=point.direction %}
+            {% translate "Go to the registration" as goto_label %}{% include "management/_goto.html" with url=entry.application_url label=goto_label %}
+          </div>
+          <dl class="mgmt-facts">
+            <div class="mgmt-fact"><dt>{% translate "Location" %}</dt><dd>{{ entry.address }}{% if entry.location_url %}{% translate "Go to the location" as location_label %}{% include "management/_goto.html" with url=entry.location_url label=location_label %}{% endif %}</dd></div>
+            <div class="mgmt-fact"><dt>{% translate "Status" %}</dt><dd><span class="mgmt-new mgmt-new-first">{% translate "In registration" %}</span> {{ entry.state }} · <a href="{{ entry.applicant_url }}">{{ entry.applicant }}</a></dd></div>
+          </dl>
+        </article>
+        {% else %}
         <article class="mgmt-place">
           <div class="mgmt-mp-nr mgmt-point-nr">
             <a class="mgmt-row-link" href="{{ entry.detail_url }}">{% if point.number %}{{ point.number|metering_point }}{% else %}–{% endif %}</a>
@@ -90,12 +116,15 @@ the form on change.
             {% endif %}
           </dl>
         </article>
+        {% endif %}
         {% endwith %}
       {% empty %}
         <p class="mgmt-empty-text">{{ empty_text }}</p>
       {% endfor %}
     </div>
   </div>
+
+  {% if pending_more %}<p class="mgmt-hint mgmt-list-notice"><a href="{{ pending_more.url }}">{{ pending_more.text }}</a></p>{% endif %}
 
   {% include "management/_list_foot.html" %}
 {% endblock %}

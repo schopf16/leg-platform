@@ -774,6 +774,8 @@ a.mgmt-sort:hover {
 
 .mgmt-new {
   display: inline-block;
+  flex-shrink: 0;
+  white-space: nowrap;
   margin-left: 8px;
   padding: 1px 8px;
   border: 1.5px solid var(--warn);
@@ -782,6 +784,16 @@ a.mgmt-sort:hover {
   font-weight: 700;
   color: var(--warn);
   vertical-align: middle;
+}
+
+.mgmt-new-first {
+  margin-left: 0;
+}
+
+/* "Edit address" of a building in registration in the list of locations: never squeezed by the address. */
+.mgmt-pending-edit {
+  flex-shrink: 0;
+  margin-left: 8px;
 }
 
 .mgmt-subwrap > td {

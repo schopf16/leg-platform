@@ -2997,6 +2997,8 @@ class MigrateTests(SimpleTestCase):
                     "generation", "street_key", "house_number_key", "postal_code", "locality_key", "street",
                     "house_number", "locality",
                 ],
+                # 0024: is a building in the current generation (the station of a location, D-118).
+                "addr_generation_egid": ["generation", "egid"],
             })
             self.assertEqual({node for node in recorded if node[0] == "addresses"}, {
                 ("addresses", "0001_initial"), ("addresses", "0002_importrequest_last_failed_repair_at"),
@@ -3020,6 +3022,7 @@ class MigrateTests(SimpleTestCase):
                 ("addresses", "0021_addressplace_centre"),
                 ("addresses", "0022_import_queue_and_published_figures"),
                 ("addresses", "0023_importrequest_worker_seen_at"),
+                ("addresses", "0024_address_generation_egid_index"),
                 ("addresses", "0014_housekeepingerror_housekeepingstatus_notify_email_and_more"),
                 ("addresses", "0013_housekeepingstatus"),
             })

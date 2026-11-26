@@ -4,6 +4,7 @@ Every view uses ``management.access``; objects come from the id in the address a
 assignments are re-validated on the server. A dialog is a normal page that works without JavaScript."""
 
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -21,6 +22,7 @@ from leg_platform.community import (
     assignments,
     grid_operator,
     history,
+    labels,
     leg_switch,
     location_list,
     locations,
@@ -31,7 +33,15 @@ from leg_platform.community import (
     problems,
 )
 from leg_platform.community.history import HistoryEvent
-from leg_platform.community.models import Direction, Leg, Location, MeteringPoint, PersonAssignment
+from leg_platform.community.models import (
+    Application,
+    ApplicationMeteringPoint,
+    Direction,
+    Leg,
+    Location,
+    MeteringPoint,
+    PersonAssignment,
+)
 from leg_platform.community.status import MeteringPointStatus
 from leg_platform.management import lists, pending
 from leg_platform.management.access import ManagementAccessMixin
@@ -54,7 +64,7 @@ from leg_platform.management.returns import created_redirect, return_url, with_n
 from leg_platform.management.summaries import duplicate_summary
 
 COLUMN_NUMBER = lists.Column(
-    "number", gettext_lazy("Metering point"), width=480, keep=True,
+    "number", gettext_lazy("Metering point"), width=300, keep=True,
     info=grid_operator.text(gettext_lazy(
         "Number of the smart meter at the %(operator)s, followed by the direction. Blue is consumption, green is feed-in."
     )),
@@ -135,6 +145,57 @@ def build_list(params):
     return MeteringPointList(state, legs, step, show_steps, columns, counts, problem_count, today, queryset)
 
 
+def pending_entries(request, state):
+    """The metering points of applications in flight (no real metering point yet) as rows of the list, marked
+    "in registration", at most ``pending.MAX_ROWS``; the search words apply to the number, the address and the applicant.
+    Returns ``(entries, more)`` (``more``: the line to the processes for the rest, or None)."""
+    places = [
+        f"building__{prefix}{name}" for prefix in ("", "location__")
+        for name in ("street", "house_number", "postal_code", "town")
+    ]
+    found = pending._search(
+        ApplicationMeteringPoint.objects.filter(
+            building__application__state__in=Application.CORRECTABLE_STATES, metering_point__isnull=True
+        ),
+        state.query, number="number", person="building__application__person__", places=(*places, "name"),
+    )
+    total = found.count()
+    found = found.select_related("building__application__person", "building__location").order_by("number", "pk")
+    entries = []
+    for point in found[:pending.MAX_ROWS]:
+        building = point.building
+        application = building.application
+        address = building.current_address()
+        entries.append(
+            {
+                "pending": True,
+                "point": SimpleNamespace(
+                    number=point.number, direction=point.direction, location=None, current_leg_id=None,
+                ),
+                "address": f"{address[0]} {address[1]}".strip(),
+                "location_url": reverse("management:locations_detail", args=[building.location_id])
+                if building.location_id else "",
+                "applicant": pending._applicant(application.person),
+                "applicant_url": reverse("management:persons_detail", args=[application.person_id]),
+                "state": labels.application_state_label(application.state),
+                "edit_url": with_next(
+                    reverse("management:processes_application_point", args=[application.pk, point.pk]), request
+                ),
+                "application_url": with_next(reverse("management:processes_application", args=[application.pk]), request),
+            }
+        )
+    return entries, pending.more_points(total, len(entries), state.query)
+
+
+def merge_pending(entries, extra, state):
+    """Put the rows of applications among the stored ones: by number when the list is sorted by number, else last."""
+    if not extra:
+        return entries
+    if state.sort != "number":
+        return entries + extra
+    return sorted(entries + extra, key=lambda entry: entry["point"].number or "", reverse=state.descending)
+
+
 class MeteringPointListView(ManagementAccessMixin, View):
     """A table on a desktop, cards on a phone."""
 
@@ -164,6 +225,11 @@ class MeteringPointListView(ManagementAccessMixin, View):
                     "detail_url": reverse("management:metering_points_detail", args=[point.pk]),
                 }
             )
+        pending_more = None
+        if page.page == 1 and not state.filtered:
+            # The rows of applications ignore the filters and the pages: only in the default view, on its first page.
+            extra, pending_more = pending_entries(request, state)
+            entries = merge_pending(entries, extra, state)
         context = lists.list_context(
             request, "metering_points", columns, state, page,
             count_text=_("%(first)d–%(last)d of %(total)d metering points") % {
@@ -183,8 +249,7 @@ class MeteringPointListView(ManagementAccessMixin, View):
             page_title=_("Metering points"),
             page_subtitle=_("All metering points with their state. Here you see what is still to do at the %(operator)s.") % operator,
             entries=entries,
-            # The rows of applications ignore the filters and the pages: only in the default view, on its first page.
-            pending=pending.points(request, state.query) if page.page == 1 and not state.filtered else None,
+            pending_more=pending_more,
             print_url=state.url_to(reverse("management:metering_points_print")),
             show_steps=show_steps,
             quick_filters=[

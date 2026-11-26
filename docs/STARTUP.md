@@ -355,7 +355,7 @@ Remove-Item Env:DJANGO_DEBUG, Env:EMAIL_ALLOWED_RECIPIENTS -ErrorAction Silently
 
 Expected: `System check identified no issues (3 silenced).` (`security.W005`, `security.W021`, `axes.W006`; D-028).
 
-Translations (the `.po` files are maintained by hand, the `.mo` files are committed, D-034; GNU gettext is in `C:\Program Files\gettext-iconv\bin`, on `PATH`). Swiss German shown; `locale\fr` and `locale\it` (`django.po`, `djangojs.po`) are checked the same way by `accounts/tests/test_translations.py` (`LanguageCatalogueTests`, also when `msgfmt` is installed):
+Translations (the `.po` files are maintained by hand, the `.mo` files are committed, D-034; GNU gettext from `winget install --id mlocati.GetText -e`, on `PATH`). Swiss German shown; `locale\fr` and `locale\it` (`django.po`, `djangojs.po`) are checked the same way by `accounts/tests/test_translations.py` (`LanguageCatalogueTests`, also when `msgfmt` is installed):
 
 ```powershell
 $po = 'locale\de_CH\LC_MESSAGES\django.po'; $mo = 'locale\de_CH\LC_MESSAGES\django.mo'
@@ -366,7 +366,7 @@ Remove-Item $tmp
 "lines with the forbidden letter: " + @(Select-String -Path $po -Pattern ([string][char]0x00DF) -SimpleMatch).Count    # 0
 ```
 
-After a change to the `.po` file run `.\.venv\Scripts\python manage.py compilemessages`, then repeat the check.
+After a change to the `.po` file run `.\.venv\Scripts\python manage.py compilemessages --ignore=.venv` (without it the command also compiles the catalogues of the installed packages), then repeat the check.
 
 ## 14. Troubleshooting
 

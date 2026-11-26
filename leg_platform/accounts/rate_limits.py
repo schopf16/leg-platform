@@ -35,8 +35,13 @@ SCOPE_MAIL_ADDRESS = "mail-address"
 SCOPE_MAIL_IP = "mail-ip"
 SCOPE_MAIL_GLOBAL = "mail-global"
 SCOPE_EXISTING_ACCOUNT_NOTICE = "existing-account-notice"
-# Staff invitations (D-087): no client-IP limit (an office shares one address), but one per staff
-# account and a pause per invited account (a double click sends one email); address and instance limits apply.
+# Creating a person (D-087, owner 2026-11-19): counted per staff account (an office shares one client address), so
+# that a hijacked session cannot create accounts without limit; no email is sent, so no address or instance limit.
+SCOPE_PERSON_CREATION = "person-creation"
+PERSON_CREATION_LIMITS = ((60, timedelta(hours=1)),)
+# Sending an invitation again, only for the invitations of before 2026-11-19 that are still pending: no client-IP
+# limit, but one per staff account and a pause per invited account (a double click sends one email); address and
+# instance limits apply.
 SCOPE_INVITATION_ACTOR = "invitation-actor"
 SCOPE_INVITATION_ACCOUNT = "invitation-account"
 INVITATION_ACTOR_LIMITS = ((60, timedelta(hours=1)),)

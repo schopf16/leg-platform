@@ -5,7 +5,9 @@ on the server. A dialog is a normal page that returns to where it was opened (``
 """
 
 import json
+import re
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 from django.contrib import messages
 from django.core.exceptions import SuspiciousOperation, ValidationError
@@ -21,13 +23,21 @@ from django.views import View
 from leg_platform.community import (
     addressing,
     history,
+    labels,
     location_list,
     locations,
     preferences,
     transformer_circuits,
 )
 from leg_platform.community.history import HistoryEvent
-from leg_platform.community.models import Location, PersonAssignment, TransformerCircuit
+from leg_platform.community.models import (
+    Application,
+    ApplicationBuilding,
+    ApplicationMeteringPoint,
+    Location,
+    PersonAssignment,
+    TransformerCircuit,
+)
 from leg_platform.management import lists, pending
 from leg_platform.management.access import ManagementAccessMixin
 from leg_platform.management.location_forms import (
@@ -74,7 +84,8 @@ def occupancy_phrase(metering_point_count, persons):
 
 
 def circuit_phrase(location):
-    return location.transformer_circuit.grid_number if location.transformer_circuit_id else _("no transformer circuit")
+    """The grid number of the circuit, or a dash (unknown station, no manual choice)."""
+    return location.transformer_circuit.grid_number if location.transformer_circuit_id else "–"
 
 
 def event_label(event):
@@ -100,6 +111,98 @@ class ListWidthsView(ManagementAccessMixin, View):
         except (ValueError, KeyError, TypeError):
             return HttpResponseBadRequest()
         return JsonResponse({"saved": True})
+
+
+def _pending_point(point, application, request):
+    """A metering point of an application in flight as a row of the sub table (marked "in registration")."""
+    return {
+        "pending": True,
+        "number": point.number,
+        "direction": point.direction,
+        "name": point.name,
+        "state": labels.application_state_label(application.state),
+        "applicant": pending._applicant(application.person),
+        "applicant_url": reverse("management:persons_detail", args=[application.person_id]),
+        "edit_url": with_next(reverse("management:processes_application_point", args=[application.pk, point.pk]), request),
+        "application_url": with_next(reverse("management:processes_application", args=[application.pk]), request),
+    }
+
+
+def pending_points_by_location(request, location_ids):
+    """The metering points of applications in flight at a stored location ("add a metering point"), by location."""
+    found = (
+        ApplicationMeteringPoint.objects.filter(
+            building__application__state__in=Application.CORRECTABLE_STATES, metering_point__isnull=True,
+            building__location_id__in=location_ids,
+        )
+        .select_related("building__application__person")
+        .order_by("number", "pk")
+    )
+    rows = {}
+    for point in found:
+        rows.setdefault(point.building.location_id, []).append(_pending_point(point, point.building.application, request))
+    return rows
+
+
+PENDING_OFFSET = 1_000_000_000  # the expand id of a building in registration: offset plus the building's pk
+
+
+def pending_entries(request, state, expanded):
+    """The new buildings of applications in flight (no stored location yet) as entries of the list, at most
+    ``pending.MAX_ROWS``; returns ``(entries, more)`` (``more``: the line to the processes for the rest, or None)."""
+    buildings = pending._search(
+        ApplicationBuilding.objects.filter(application__state__in=Application.CORRECTABLE_STATES, location__isnull=True),
+        state.query, number="metering_points__number", person="application__person__",
+        places=("street", "house_number", "postal_code", "town", "name"),
+    ).distinct()
+    total = buildings.count()
+    found = (
+        buildings.select_related("application__person").prefetch_related("metering_points")
+        .order_by("street", "house_number", "pk")[:pending.MAX_ROWS]
+    )
+    entries = []
+    for building in found:
+        application = building.application
+        points = [_pending_point(point, application, request) for point in building.metering_points.all()]
+        entries.append(
+            {
+                "pending": True,
+                "location": SimpleNamespace(
+                    pk=PENDING_OFFSET + building.pk, street=building.street, house_number=building.house_number,
+                    postal_code=building.postal_code, town=building.town, egid=building.egid,
+                    needs_confirmation=False, address_correction_open=False,
+                ),
+                "points": points,
+                "is_open": bool(points) and (PENDING_OFFSET + building.pk) in expanded,
+                "can_open": bool(points),
+                "circuit": transformer_circuits.station_number(building.egid) or "–",
+                "count_phrase": count_phrase(len(points)),
+                "occupancy": pending._applicant(application.person),
+                "applicant_url": reverse("management:persons_detail", args=[application.person_id]),
+                "state": labels.application_state_label(application.state),
+                "edit_url": with_next(
+                    reverse("management:processes_application_building", args=[application.pk, building.pk]), request
+                ),
+                "detail_url": with_next(reverse("management:processes_application", args=[application.pk]), request),
+            }
+        )
+    return entries, pending.more_buildings(total, len(entries), state.query)
+
+
+def _address_key(entry):
+    """Street, then the house number as a number, then as text (as ``location_list.apply_sort``)."""
+    location = entry["location"]
+    digits = re.match(r"\d*", location.house_number or "").group(0)
+    return (location.street.casefold(), int(digits) if digits else 0, location.house_number or "")
+
+
+def merge_pending(entries, extra, state):
+    """Put the entries of applications among the stored ones: by address when the list is sorted by address, else last."""
+    if not extra:
+        return entries
+    if state.sort != "address":
+        return entries + extra
+    return sorted(entries + extra, key=_address_key, reverse=state.descending)
 
 
 def occupancy_options():
@@ -158,8 +261,9 @@ class LocationListView(ManagementAccessMixin, View):
         expanded = set(preferences.get_preference(request.user, "locations").expanded_locations)
 
         entries = []
+        in_registration = pending_points_by_location(request, [location.pk for location in page.items])
         for location in page.items:
-            points = rows[location.pk]
+            points = list(rows[location.pk]) + in_registration.get(location.pk, [])
             entries.append(
                 {
                     "location": location,
@@ -173,6 +277,11 @@ class LocationListView(ManagementAccessMixin, View):
                     "detail_url": reverse("management:locations_detail", args=[location.pk]),
                 }
             )
+        pending_more = None
+        if page.page == 1 and not state.filtered:
+            # The buildings of applications ignore the filters and the pages: only in the default view, on its first page.
+            extra, pending_more = pending_entries(request, state, expanded)
+            entries = merge_pending(entries, extra, state)
         openable = [entry for entry in entries if entry["can_open"]]
         all_open = bool(openable) and all(entry["is_open"] for entry in openable)
         count_text = _("%(first)d–%(last)d of %(total)d locations") % {
@@ -186,8 +295,7 @@ class LocationListView(ManagementAccessMixin, View):
             page_title=_("Locations"),
             page_subtitle=_("All locations of the LEG with their metering points."),
             entries=entries,
-            # The rows of applications ignore the filters and the pages: only in the default view, on its first page.
-            pending=pending.new_buildings(request, state.query) if page.page == 1 and not state.filtered else None,
+            pending_more=pending_more,
             print_url=state.url_to(reverse("management:locations_print")),
             all_open=all_open,
             expand_ids=[entry["location"].pk for entry in openable],
@@ -230,7 +338,13 @@ class LocationExpandedView(ManagementAccessMixin, View):
         if open_ is None:
             open_ = ids[0] not in current
         current = (current | set(ids)) if open_ else (current - set(ids))
-        current = set(Location.objects.filter(pk__in=current).values_list("pk", flat=True))  # drop deleted ones
+        stored = {i for i in current if i < PENDING_OFFSET}
+        in_registration = {i - PENDING_OFFSET for i in current if i >= PENDING_OFFSET}
+        current = set(Location.objects.filter(pk__in=stored).values_list("pk", flat=True))  # drop deleted ones
+        current |= {
+            PENDING_OFFSET + i
+            for i in ApplicationBuilding.objects.filter(pk__in=in_registration).values_list("pk", flat=True)
+        }
         try:
             preferences.save_expanded_locations(request.user, current)
         except ValueError:

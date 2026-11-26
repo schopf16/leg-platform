@@ -1,7 +1,8 @@
-"""The steps that an invited person takes (D-087): the link of the email, the password, the confirmation of the data
-that the staff entered, and the activation with the customer number. The account is created by the staff
-(``community.persons.create_person``); these tests start there and follow the pages of the registration. The rules of
-the creation and of the changes are in ``community/tests/test_person_support.py``."""
+"""The steps that a person invited before 2026-11-19 takes (D-087): the link of the email, the password, the confirmation
+of the data that the staff entered, and the activation with the customer number. Staff create no invitation any more
+(``community.persons.create_person`` makes an active account, ``test_person_creation.py``); the invitations that may
+still be pending are built with ``legacy_invitation.invite_legacy_person``. The rules of the changes are in
+``community/tests/test_person_support.py``."""
 
 import re
 from datetime import timedelta
@@ -22,6 +23,7 @@ from leg_platform.accounts.tests.helpers import (
     run_mail_queue,
     verification_path,
 )
+from leg_platform.accounts.tests.legacy_invitation import invite_legacy_person
 from leg_platform.community import persons
 from leg_platform.community.tests.helpers import staff_user
 
@@ -43,7 +45,7 @@ class InvitationFlowTests(TestCase):
         cls.staff = staff_user("staff.invitation@example.org")
 
     def invite(self, email="erika.neu@example.org", **values):
-        person = persons.create_person(self.staff, email, {**DATA, **values})
+        person = invite_legacy_person(self.staff, email, {**DATA, **values})
         run_mail_queue()
         return person, verification_path(mail.outbox[-1])
 
@@ -84,8 +86,8 @@ class InvitationFlowTests(TestCase):
         self.assertFalse(person.groups.exists() or person.user_permissions.exists())
         # The data of the staff that the steps do not show stays, the consent is stored.
         self.assertEqual(
-            (person.salutation, person.address_line_1, person.phone_number.as_e164, person.country.code),
-            ("mrs", "c/o Treuhand", "+41311234567", "CH"),
+            (person.address_line_1, person.phone_number.as_e164, person.country.code),
+            ("c/o Treuhand", "+41311234567", "CH"),
         )
         self.assertIsNotNone(person.privacy_accepted_at)
         self.assertEqual(SecurityEvent.objects.filter(event=SecurityEvent.Event.REGISTRATION_COMPLETED, account_id=person.pk).count(), 1)
@@ -95,6 +97,70 @@ class InvitationFlowTests(TestCase):
     def complete(self, client, reference, **overrides):
         data = completion_data(registration=reference, **overrides)
         return client.post(reverse("accounts:registration_complete"), data)
+
+    def test_the_person_sees_the_salutation_and_the_company_of_the_staff_and_corrects_them(self):
+        person, path = self.invite(salutation="mrs", organisation_name="Treuhand AG")
+        client = Client()
+        reference = self.open(client, path)
+        html = client.get(reverse("accounts:registration_complete")).content.decode()
+        self.assertIn('<option value="mrs" selected>Frau</option>', html)
+        self.assertIn('value="Treuhand AG"', html)
+        done = self.complete(
+            client, reference, first_name="Erika", last_name="Neu", salutation="mr", organisation_name="",
+        )
+        self.assertEqual(done.status_code, 302)
+        person.refresh_from_db()
+        self.assertEqual((person.status, person.salutation, person.organisation_name), ("active", "mr", ""))
+
+    def test_the_person_keeps_the_salutation_and_the_company_of_the_staff_by_confirming_them(self):
+        person, path = self.invite(salutation="family", organisation_name="Treuhand AG")
+        client = Client()
+        reference = self.open(client, path)
+        done = self.complete(
+            client, reference, first_name="Erika", last_name="Neu", salutation="family", organisation_name="Treuhand AG",
+        )
+        self.assertEqual(done.status_code, 302)
+        person.refresh_from_db()
+        self.assertEqual((person.salutation, person.organisation_name), ("family", "Treuhand AG"))
+
+    def test_an_invited_company_completes_without_the_name_of_a_person(self):
+        person, path = self.invite(salutation="", first_name="", last_name="", organisation_name="Treuhand AG")
+        client = Client()
+        reference = self.open(client, path)
+        html = client.get(reverse("accounts:registration_complete")).content.decode()
+        self.assertIn('value="Treuhand AG"', html)
+        company = {"salutation": "", "first_name": "", "last_name": "", "organisation_name": "Treuhand AG"}
+        # Without the company and without a name nothing is activated; the messages stand at the name fields.
+        refused = self.complete(client, reference, **{**company, "organisation_name": ""})
+        self.assertEqual(refused.status_code, 200)
+        self.assertContains(refused, "Geben Sie einen Vornamen oder einen Firmennamen ein.")
+        self.assertContains(refused, "Geben Sie einen Nachnamen oder einen Firmennamen ein.")
+        person.refresh_from_db()
+        self.assertEqual((person.status, person.organisation_name), ("unverified", "Treuhand AG"))
+        self.assertEqual(self.complete(client, reference, **company).status_code, 302)
+        person.refresh_from_db()
+        self.assertEqual(
+            (person.status, person.first_name, person.last_name, person.organisation_name, person.display_name),
+            ("active", "", "", "Treuhand AG", "Treuhand AG"),
+        )
+        self.assertRegex(person.customer_number_id, r"^\d{6}$")
+
+    def test_an_invited_person_may_clear_the_names_when_a_company_is_named(self):
+        person, path = self.invite()
+        client = Client()
+        reference = self.open(client, path)
+        # Clearing the names alone is refused (no company), with a company it is the rule of the model.
+        refused = self.complete(client, reference, first_name="", last_name="", organisation_name="")
+        self.assertEqual(refused.status_code, 200)
+        person.refresh_from_db()
+        self.assertEqual((person.status, person.first_name), ("unverified", "Erika"))
+        done = self.complete(client, reference, first_name="", last_name="", organisation_name="Neu Treuhand GmbH")
+        self.assertEqual(done.status_code, 302)
+        person.refresh_from_db()
+        self.assertEqual(
+            (person.status, person.first_name, person.last_name, person.organisation_name),
+            ("active", "", "", "Neu Treuhand GmbH"),
+        )
 
     def test_the_link_cannot_be_used_twice_and_an_expired_link_leads_nowhere(self):
         person, path = self.invite()
@@ -178,8 +244,8 @@ class InvitationFlowTests(TestCase):
         data_step = next(fields for fields in calls if "privacy_accepted_at" in fields)
         self.assertEqual(
             set(data_step),
-            {"first_name", "last_name", "street", "house_number", "town", "swiss_postal_code", "foreign_postal_code",
-             "privacy_accepted_at", "privacy_accepted_url"},
+            {"salutation", "first_name", "last_name", "organisation_name", "street", "house_number", "town",
+             "swiss_postal_code", "foreign_postal_code", "privacy_accepted_at", "privacy_accepted_url"},
         )
         person.refresh_from_db()
         self.assertEqual(person.status, "active")

@@ -51,10 +51,10 @@ class RoundTripTests(TestCase):
         self.client.force_login(self.staff)
 
     def test_a_person_created_from_the_assign_dialog_can_go_back_to_the_metering_point(self):
-        # UX-004: an invited person cannot be assigned yet (D-081); the banner leads back instead of to a dead end.
+        # UX-004: the banner of the new person leads back to the metering point instead of to a dead end.
         dialog = reverse("management:metering_points_person", args=[self.point.pk])
         page = self.client.get(dialog).content.decode()
-        self.assertIn("Person fehlt? Neue Person einladen", page)
+        self.assertIn("Person fehlt? Neue Person anlegen", page)
         self.assertIn("Keine Person gefunden. Zugewiesen werden können nur aktive Personen mit Kundennummer.", page)
         link = html.unescape(re.search(r'href="([^"]*persons/new/[^"]*)"', page).group(1))
         response = self.client.post(link, {**CREATE, "next": dialog})
@@ -64,15 +64,15 @@ class RoundTripTests(TestCase):
         back = reverse("management:metering_points_detail", args=[self.point.pk])
         self.assertIn(f'<a class="btn btn-accent-outline" href="{back}">Zurück zum Messpunkt</a>', text)
         self.assertIn('class="mgmt-banner is-neutral"', text)  # a hint, no warning (UX-016)
-        self.assertIn("Person angelegt. Die Einladung wurde gesendet.", text)
-        # D-081 stays: the text does not suggest that the person can be assigned now (UX-004, D-102).
-        self.assertIn("sobald sich die Person registriert hat und eine Kundennummer besitzt", text)
-        self.assertNotIn("Ordnen Sie der Person", text)
+        self.assertIn("Person angelegt. Weiter: Messpunkt zuordnen.", text)
+        # No invitation is mentioned: the person is active with a customer number (D-087, owner 2026-11-19).
+        self.assertNotIn("Einladung", text)
+        self.assertNotIn("sobald sich die Person registriert hat", text)
         # The plain message is not queued as well (UX-016): one statement, not two.
-        self.assertNotIn("Die Person wurde angelegt und die Einladung wurde gesendet.", text)
+        self.assertNotIn("Die Person wurde angelegt.", text)
 
     def test_the_back_link_is_neutral_when_it_leads_to_the_dialog_and_named_when_it_leads_to_the_list(self):
-        # S-1: with a safe next the top link goes to the page the person was invited from, so it just says "Zurück".
+        # S-1: with a safe next the top link goes to the page the person was created from, so it just says "Zurück".
         dialog = reverse("management:metering_points_person", args=[self.point.pk])
         created = self.client.post(reverse("management:persons_new"), {**CREATE, "next": dialog})
         detail = created["Location"].split("?")[0]

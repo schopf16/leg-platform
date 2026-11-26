@@ -19,6 +19,7 @@ from django.utils import timezone
 
 from leg_platform.accounts.models import MailJob
 from leg_platform.community import (
+    transformer_circuits,
     application_notices,
     archived,
     assignments,
@@ -255,6 +256,7 @@ def _location_for(building, staff, confirm):
         return location
     existing = _existing_for(building)
     if existing is not None:
+        transformer_circuits.derive(existing, staff)
         return existing
     location = _new_location(building, confirm)
     try:
@@ -269,6 +271,7 @@ def _location_for(building, staff, confirm):
     history.record(location, HistoryEvent.CREATED, staff)
     if confirm:
         history.record(location, HistoryEvent.LOCATION_CONFIRMED, staff)
+    transformer_circuits.derive(location, staff)
     return location
 
 
