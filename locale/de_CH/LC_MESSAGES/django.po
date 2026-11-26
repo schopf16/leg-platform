@@ -2133,11 +2133,8 @@ msgstr ""
 msgid "Please confirm that you accept the privacy notice."
 msgstr "Bitte bestätigen Sie, dass Sie die Datenschutzerklärung akzeptieren."
 
-msgid "Enter your first name."
-msgstr "Geben Sie Ihren Vornamen ein."
-
-msgid "Enter your last name."
-msgstr "Geben Sie Ihren Nachnamen ein."
+msgid "Only for a company. First and last name may then stay empty."
+msgstr "Nur für Firmen. Vorname und Nachname dürfen dann leer bleiben."
 
 msgid "Enter your street."
 msgstr "Geben Sie Ihre Strasse ein."
@@ -2227,6 +2224,7 @@ msgstr ""
 "Der sechsstellige Bestätigungscode. Im Text muss er allein in einem Absatz stehen (eine eigene Zeile mit einer "
 "Leerzeile davor und danach): Die E-Mail zeigt diesen Absatz als grossen Code."
 
+#, python-format
 msgid ""
 "Hello\n"
 "\n"
@@ -2236,7 +2234,7 @@ msgid ""
 "\n"
 "%(login_url)s\n"
 "\n"
-"If you do not know the password, you can request a new one on the login page."
+"If you have no password yet or do not know it, you can choose a new one on the login page with \"Forgot password?\"."
 msgstr ""
 "Guten Tag\n"
 "\n"
@@ -2246,7 +2244,7 @@ msgstr ""
 "\n"
 "%(login_url)s\n"
 "\n"
-"Wenn Sie das Passwort nicht kennen, können Sie auf der Anmeldeseite ein neues anfordern."
+"Wenn Sie noch kein Passwort haben oder es nicht kennen, können Sie auf der Anmeldeseite mit «Passwort vergessen?» ein neues festlegen."
 
 msgid ""
 "Confirm that <strong class=\"address-text\">%(email)s</strong> should become"
@@ -5192,14 +5190,12 @@ msgid "Edit payment and customer numbers"
 msgstr "Zahlung und Kundennummern bearbeiten"
 
 msgid ""
-"The person receives an email with a link to confirm the email address and to"
-" choose a password."
+"The person gets no email and has nothing to do. To sign in, the person chooses a password with \"Forgot password?\" on the login page."
 msgstr ""
-"Die Person erhält eine E-Mail mit einem Link, um die E-Mail-Adresse zu "
-"bestätigen und ein Passwort zu wählen."
+"Die Person erhält keine E-Mail und muss nichts tun. Zum Anmelden wählt sie auf der Anmeldeseite mit «Passwort vergessen?» ein Passwort."
 
-msgid "The person was created and the invitation was sent."
-msgstr "Die Person wurde angelegt und die Einladung wurde gesendet."
+msgid "The person was created."
+msgstr "Die Person wurde angelegt."
 
 msgid "The invitation was sent."
 msgstr "Die Einladung wurde gesendet."
@@ -5221,6 +5217,9 @@ msgstr "Kundendaten geändert"
 
 msgid "Person created and invited by staff"
 msgstr "Person von der Verwaltung angelegt und eingeladen"
+
+msgid "Person created by staff"
+msgstr "Person von der Verwaltung angelegt"
 
 msgid "Invitation sent again by staff"
 msgstr "Einladung von der Verwaltung erneut gesendet"
@@ -5413,9 +5412,6 @@ msgstr ""
 "Wählen Sie den Trafokreis des Standorts %(address)s oder legen Sie einen "
 "neuen an."
 
-msgid "Enter the street."
-msgstr "Geben Sie die Strasse ein."
-
 msgid ""
 "Choose a metering point that has no LEG yet. It is assigned to the LEG "
 "“%(name)s”."
@@ -5426,8 +5422,8 @@ msgstr ""
 msgid "Location missing? Create a new location"
 msgstr "Standort fehlt? Neuen Standort anlegen"
 
-msgid "Person missing? Invite a new person"
-msgstr "Person fehlt? Neue Person einladen"
+msgid "Person missing? Create a new person"
+msgstr "Person fehlt? Neue Person anlegen"
 
 msgid "Back to the metering point"
 msgstr "Zurück zum Messpunkt"
@@ -5463,14 +5459,6 @@ msgstr "Standort angelegt. Weiter: Messpunkte dieses Standorts erfassen."
 
 msgid "LEG created. Next: assign metering points to the LEG."
 msgstr "LEG angelegt. Weiter: Messpunkte der LEG zuordnen."
-
-msgid ""
-"Person created. The invitation was sent. A metering point can be assigned "
-"once the person has registered and has a customer number."
-msgstr ""
-"Person angelegt. Die Einladung wurde gesendet. Ein Messpunkt kann zugeordnet"
-" werden, sobald sich die Person registriert hat und eine Kundennummer "
-"besitzt."
 
 msgid "Person created. Next: assign a metering point."
 msgstr "Person angelegt. Weiter: Messpunkt zuordnen."
@@ -10249,3 +10237,227 @@ msgstr "Konto in der Systemverwaltung"
 
 msgid "Open in the management area"
 msgstr "In der Verwaltung öffnen"
+
+# Swisseldex Datahub configuration and connection test (D-139)
+msgid "Enter the host name only, for example datahub.swisseldex.ch (no ftpes://, no path, no port)."
+msgstr "Geben Sie nur den Hostnamen ein, zum Beispiel datahub.swisseldex.ch (ohne ftpes://, ohne Pfad, ohne Port)."
+
+msgid "The value must not contain line breaks or control characters."
+msgstr "Der Wert darf keine Zeilenumbrüche oder Steuerzeichen enthalten."
+
+msgid "Connection succeeded"
+msgstr "Verbindung erfolgreich"
+
+msgid "Configuration incomplete"
+msgstr "Konfiguration unvollständig"
+
+msgid "Stored password cannot be read"
+msgstr "Gespeichertes Passwort nicht lesbar"
+
+msgid "Server not reachable"
+msgstr "Server nicht erreichbar"
+
+msgid "Encrypted connection failed (certificate or TLS)"
+msgstr "Verschlüsselte Verbindung fehlgeschlagen (Zertifikat oder TLS)"
+
+msgid "Login refused"
+msgstr "Anmeldung abgelehnt"
+
+msgid "Directory not found"
+msgstr "Verzeichnis nicht gefunden"
+
+msgid "Directory could not be listed"
+msgstr "Verzeichnis konnte nicht aufgelistet werden"
+
+msgid "No answer in time"
+msgstr "Keine rechtzeitige Antwort"
+
+msgid "Other error"
+msgstr "Anderer Fehler"
+
+msgid "FTPES server"
+msgstr "FTPES-Server"
+
+msgid "The host name of the Datahub, without ftpes://."
+msgstr "Der Hostname des Datahub, ohne ftpes://."
+
+msgid "port"
+msgstr "Port"
+
+msgid "Explicit TLS (FTPES) on the control port; 21 according to the Datahub manual."
+msgstr "Explizites TLS (FTPES) auf dem Steuerport; gemäss Handbuch des Datahub 21."
+
+msgid "FTPES user name"
+msgstr "FTPES-Benutzername"
+
+msgid "directory on the server"
+msgstr "Verzeichnis auf dem Server"
+
+msgid "Empty: the start directory after the login. The Datahub keeps all messages in the main directory."
+msgstr "Leer: das Startverzeichnis nach der Anmeldung. Der Datahub legt alle Meldungen im Hauptverzeichnis ab."
+
+msgid "own market partner name"
+msgstr "eigener Marktpartnername"
+
+msgid "The name of the LEG as registered on the Datahub."
+msgstr "Der Name der LEG, wie er auf dem Datahub registriert ist."
+
+msgid "own EIC"
+msgstr "eigener EIC"
+
+msgid "The Energy Identification Code of the LEG on the Datahub (16 characters)."
+msgstr "Der Energy Identification Code der LEG auf dem Datahub (16 Zeichen)."
+
+msgid "EIC of the distribution system operator"
+msgstr "EIC des Verteilnetzbetreibers"
+
+msgid "The Energy Identification Code of the grid operator that sends the load profiles."
+msgstr "Der Energy Identification Code des Netzbetreibers, der die Lastgänge sendet."
+
+msgid "collection active"
+msgstr "Abholung aktiv"
+
+msgid "Only one server may collect: collected messages are later deleted on the Datahub. It can be switched on only where the server configuration allows it."
+msgstr "Nur ein Server darf abholen: Abgeholte Meldungen werden später auf dem Datahub gelöscht. Die Abholung lässt sich nur einschalten, wo die Serverkonfiguration es erlaubt."
+
+msgid "last connection test"
+msgstr "letzter Verbindungstest"
+
+msgid "result of the last connection test"
+msgstr "Ergebnis des letzten Verbindungstests"
+
+msgid "files found"
+msgstr "gefundene Dateien"
+
+msgid "Swisseldex Datahub"
+msgstr "Swisseldex Datahub"
+
+msgid "Enter a valid EIC: 16 characters (digits, capital letters, hyphen) with a correct check character."
+msgstr "Geben Sie einen gültigen EIC ein: 16 Zeichen (Ziffern, Grossbuchstaben, Bindestrich) mit korrektem Prüfzeichen."
+
+msgid "FTPES password"
+msgstr "FTPES-Passwort"
+
+msgid "Stored encrypted and never shown again. Leave it empty to keep the stored password."
+msgstr "Wird verschlüsselt gespeichert und nie mehr angezeigt. Leer lassen, um das gespeicherte Passwort zu behalten."
+
+msgid "Remove the stored password"
+msgstr "Gespeichertes Passwort entfernen"
+
+msgid "Enter a new password or remove the stored one, not both."
+msgstr "Geben Sie ein neues Passwort ein oder entfernen Sie das gespeicherte, nicht beides."
+
+msgid "Enter the password again when you change the server or the port."
+msgstr "Geben Sie das Passwort erneut ein, wenn Sie den Server oder den Port ändern."
+
+msgid "The collection is locked on this server by the server configuration. Only the one server that collects the messages may switch it on."
+msgstr "Die Abholung ist auf diesem Server durch die Serverkonfiguration gesperrt. Nur der eine Server, der die Meldungen abholt, darf sie einschalten."
+
+msgid "Enter the user name, the password and the own EIC before switching the collection on."
+msgstr "Geben Sie den Benutzernamen, das Passwort und den eigenen EIC ein, bevor Sie die Abholung einschalten."
+
+msgid "FTPES access"
+msgstr "FTPES-Zugang"
+
+msgid "The platform collects the messages from the server of the Datahub (FTP with explicit TLS). The access data come from the Datahub."
+msgstr "Die Plattform holt die Meldungen beim Server des Datahub ab (FTP mit explizitem TLS). Die Zugangsdaten stammen vom Datahub."
+
+msgid "Market partners"
+msgstr "Marktpartner"
+
+msgid "Collection"
+msgstr "Abholung"
+
+msgid "stored password"
+msgstr "gespeichertes Passwort"
+
+msgid "stored"
+msgstr "gespeichert"
+
+msgid "none stored"
+msgstr "keines"
+
+msgid "collection on this server"
+msgstr "Abholung auf diesem Server"
+
+msgid "Locked by the server configuration: this server never collects. Only the one server that collects may allow it (DATAHUB_COLLECTION_ALLOWED)."
+msgstr "Durch die Serverkonfiguration gesperrt: Dieser Server holt nie ab. Nur der eine Server, der abholt, darf es erlauben (DATAHUB_COLLECTION_ALLOWED)."
+
+msgid "The switch below is on (for example from a copied database); it has no effect here."
+msgstr "Der Schalter unten ist eingeschaltet (zum Beispiel aus einer kopierten Datenbank); er hat hier keine Wirkung."
+
+msgid "Active."
+msgstr "Aktiv."
+
+msgid "Allowed on this server; the switch is off."
+msgstr "Auf diesem Server erlaubt; der Schalter ist ausgeschaltet."
+
+msgid "No test yet."
+msgstr "Noch kein Test."
+
+#, python-format
+msgid "%(time)s: running"
+msgstr "%(time)s: läuft"
+
+#, python-format
+msgid "%(time)s: %(result)s, %(count)d file"
+msgid_plural "%(time)s: %(result)s, %(count)d files"
+msgstr[0] "%(time)s: %(result)s, %(count)d Datei"
+msgstr[1] "%(time)s: %(result)s, %(count)d Dateien"
+
+#, python-format
+msgid "%(time)s: %(result)s"
+msgstr "%(time)s: %(result)s"
+
+msgid "Test connection"
+msgstr "Verbindung testen"
+
+msgid "The Datahub refuses a second login within 60 seconds. Wait a minute and test again."
+msgstr "Der Datahub lehnt eine zweite Anmeldung innerhalb von 60 Sekunden ab. Warten Sie eine Minute und testen Sie erneut."
+
+#, python-format
+msgid "Connection succeeded. Files in the directory: %(count)d."
+msgstr "Verbindung erfolgreich. Dateien im Verzeichnis: %(count)d."
+
+#, python-format
+msgid "Answer: %(text)s"
+msgstr "Antwort: %(text)s"
+
+msgid "The test needs the server, the port, the user name and the password."
+msgstr "Der Test braucht den Server, den Port, den Benutzernamen und das Passwort."
+
+msgid "The stored password cannot be read (the secret key of the server changed). Enter it again."
+msgstr "Das gespeicherte Passwort kann nicht gelesen werden (der geheime Schlüssel des Servers hat sich geändert). Geben Sie es erneut ein."
+
+msgid "The server cannot be reached. Check the server name, the port and whether this server may connect to it."
+msgstr "Der Server ist nicht erreichbar. Prüfen Sie den Servernamen, den Port und ob dieser Server sich mit ihm verbinden darf."
+
+msgid "The encrypted connection failed: the certificate or TLS was not accepted."
+msgstr "Die verschlüsselte Verbindung ist fehlgeschlagen: Das Zertifikat oder TLS wurde nicht akzeptiert."
+
+msgid "The login was refused. Check the user name and the password."
+msgstr "Die Anmeldung wurde abgelehnt. Prüfen Sie den Benutzernamen und das Passwort."
+
+msgid "The directory was not found on the server."
+msgstr "Das Verzeichnis wurde auf dem Server nicht gefunden."
+
+msgid "The directory could not be listed."
+msgstr "Das Verzeichnis konnte nicht aufgelistet werden."
+
+msgid "The server did not answer in time."
+msgstr "Der Server hat nicht rechtzeitig geantwortet."
+
+msgid "The connection test failed. The reason is not known."
+msgstr "Der Verbindungstest ist fehlgeschlagen. Der Grund ist nicht bekannt."
+
+msgid "The platform logs in to the Datahub with the stored data and counts the files in the directory. It downloads, moves and deletes nothing."
+msgstr "Die Plattform meldet sich mit den gespeicherten Daten beim Datahub an und zählt die Dateien im Verzeichnis. Sie lädt nichts herunter, verschiebt nichts und löscht nichts."
+
+msgid "The Datahub refuses a second login within 60 seconds. The test takes at most 20 seconds."
+msgstr "Der Datahub lehnt eine zweite Anmeldung innerhalb von 60 Sekunden ab. Der Test dauert höchstens 20 Sekunden."
+
+msgid "Swisseldex Datahub configuration changed"
+msgstr "Konfiguration des Swisseldex Datahub geändert"
+
+msgid "Swisseldex Datahub connection tested"
+msgstr "Verbindung zum Swisseldex Datahub getestet"
