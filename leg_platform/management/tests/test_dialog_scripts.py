@@ -22,7 +22,7 @@ from leg_platform.community.tests.helpers import make_circuit, make_location, ma
 ROOT = Path(settings.BASE_DIR) / "leg_platform"
 SCRIPTS = ROOT / "management" / "static" / "management" / "js"
 SHARED_SCRIPTS = ROOT / "static" / "js"
-NEW_SCRIPTS = ("field-check.js", "combobox.js", "circuit-field.js", "option-note.js", "dialog-focus.js")
+NEW_SCRIPTS = ("field-check.js", "combobox.js", "option-note.js", "dialog-focus.js")
 
 
 def script(name):
@@ -111,6 +111,111 @@ class ScriptBehaviourTests(SimpleTestCase):
         too_long = [r for r in json.loads(html.unescape(found.group(1))) if r["typed"] == "1" * 21][0]
         self.assertEqual(too_long["message"], "TOO_LONG 21")
 
+    def run_combobox(self, steps, *, first_field=False):
+        """Run ``combobox.js`` on two prefilled fields (``c``: minimum 0, ``p``: the default minimum) with a ``fetch``
+        that answers after ``window.delay`` ms (0: at once) and records the texts asked; ``steps`` is script run after
+        the load. ``first_field``: ``c`` is the first field of a dialog and ``dialog-focus.js`` runs after the combobox,
+        as in ``dialog.html``, with a fine pointer. Returns the result."""
+        chrome = self.browser()
+        if chrome is None:
+            self.skipTest("no Chrome or Chromium found")
+        focus = (
+            "<script>window.matchMedia=()=>({matches:true});</script>"
+            f'<script src="{(SCRIPTS / "dialog-focus.js").as_uri()}"></script>'
+            if first_field
+            else ""
+        )
+        page = (
+            '<!doctype html><meta charset="utf-8"><body>'
+            '<input id="c" data-suggest-url="/s/" data-suggest-minimum="0" value="Automatisch: TRA1"'
+            f'{" data-first-field" if first_field else ""}>'
+            '<input id="p" data-suggest-url="/p/" value="Anna Muster"><pre id="out"></pre>'
+            "<script>window.asked=[];window.delay=0;"
+            "window.fetch=(url)=>{const q=new URL(url,'http://x').searchParams.get('q');"
+            "window.asked.push(q);const answer={status:200,ok:true,headers:{get:()=>null},"
+            "json:()=>Promise.resolve({results:q?[q+' · eins']:['Automatisch: TRA1','TRA1 · eins','TRA2 · zwei']})};"
+            "return new Promise((done)=>setTimeout(()=>done(answer),window.delay));};"
+            f'</script><script src="{(SCRIPTS / "combobox.js").as_uri()}"></script>{focus}'
+            "<script>const c=document.getElementById('c');const p=document.getElementById('p');"
+            "const state=(input)=>{const list=input.parentNode.querySelector('[role=listbox]');return {open:!list.hidden,"
+            "rows:[...list.querySelectorAll('.mgmt-combobox-main')].map((row)=>row.textContent),value:input.value,"
+            "selected:input.value.slice(input.selectionStart,input.selectionEnd)};};"
+            "const result={};const wait=(ms)=>new Promise((done)=>setTimeout(done,ms));"
+            f"(async()=>{{{steps}"
+            "document.getElementById('out').textContent='RESULT'+JSON.stringify(result)+'END';})();</script>"
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            file = Path(folder) / "combobox.html"
+            file.write_text(page, encoding="utf-8")
+            done = subprocess.run(
+                [chrome, "--headless=new", "--no-sandbox", "--disable-gpu", f"--user-data-dir={folder}/profile",
+                 "--allow-file-access-from-files", "--virtual-time-budget=5000", "--dump-dom", file.as_uri()],
+                capture_output=True, timeout=120, check=False,
+            )
+        output = done.stdout.decode("utf-8", "replace")
+        found = re.search(r"RESULT(.*?)END", output, re.S)
+        self.assertIsNotNone(found, output[:500])
+        return json.loads(html.unescape(found.group(1)))
+
+    def test_a_prefilled_field_with_minimum_zero_lists_everything_on_focus_and_filters_while_typing(self):
+        # Tester finding 2 (D-142): the circuit field is always prefilled; a focus selects the text and lists from the
+        # start, typing replaces the text and filters. A field with the default minimum is unchanged.
+        result = self.run_combobox(
+            "c.dispatchEvent(new FocusEvent('focus'));await wait(50);result.focused=state(c);"
+            "result.askedOnFocus=[...window.asked];"
+            "c.value='TRA2';c.dispatchEvent(new Event('input'));await wait(300);result.typed=state(c);"
+            "c.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));c.click();await wait(50);"
+            "result.clicked=state(c);"
+            "p.dispatchEvent(new FocusEvent('focus'));await wait(300);result.other=state(p);"
+            "result.asked=window.asked;"
+        )
+        self.assertEqual(result["askedOnFocus"], [""])
+        self.assertEqual(result["focused"]["rows"], ["Automatisch: TRA1", "TRA1", "TRA2"])
+        self.assertTrue(result["focused"]["open"])
+        self.assertEqual(result["focused"]["selected"], "Automatisch: TRA1")  # typing replaces it
+        self.assertEqual((result["typed"]["rows"], result["typed"]["open"]), (["TRA2"], True))
+        self.assertEqual((result["clicked"]["open"], result["clicked"]["rows"][0]), (True, "Automatisch: TRA1"))
+        self.assertEqual(result["asked"], ["", "TRA2", ""])  # the other field asked nothing on its focus
+        self.assertFalse(result["other"]["open"])
+        self.assertEqual(result["other"]["value"], "Anna Muster")
+
+    def test_the_first_field_of_a_dialog_keeps_its_text_selected_so_that_typing_replaces_it(self):
+        # Tester finding (D-142): ``dialog-focus.js`` put the caret at the end of the circuit field and typing appended.
+        result = self.run_combobox(
+            "await wait(50);result.opened=state(c);result.focused=document.activeElement===c;", first_field=True
+        )
+        self.assertTrue(result["focused"])
+        self.assertEqual(result["opened"]["selected"], "Automatisch: TRA1")
+        self.assertTrue(result["opened"]["open"])
+        self.assertEqual(result["opened"]["rows"][0], "Automatisch: TRA1")
+
+    def test_a_click_that_opens_the_list_again_selects_the_whole_text(self):
+        # Tester finding (D-142): focus, Escape, then a click into the still selected text put a caret into it.
+        result = self.run_combobox(
+            "c.focus();await wait(50);c.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));"
+            "result.closed=state(c);c.setSelectionRange(4,4);"
+            "c.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));"
+            "const up=new MouseEvent('mouseup',{bubbles:true,cancelable:true});c.dispatchEvent(up);"
+            "result.upPrevented=up.defaultPrevented;c.click();await wait(50);result.clicked=state(c);"
+            "c.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));"
+            "const inside=new MouseEvent('mouseup',{bubbles:true,cancelable:true});c.dispatchEvent(inside);"
+            "result.openPrevented=inside.defaultPrevented;"
+        )
+        self.assertFalse(result["closed"]["open"])
+        self.assertTrue(result["upPrevented"])
+        self.assertEqual((result["clicked"]["open"], result["clicked"]["selected"]), (True, "Automatisch: TRA1"))
+        self.assertFalse(result["openPrevented"])  # with the list open a click places the caret as usual
+
+    def test_the_list_from_the_start_is_dropped_once_typing_began(self):
+        # Security review note: the answer for the whole list came after the person started typing and was shown.
+        result = self.run_combobox(
+            "window.delay=60;c.focus();c.value='TRA2';c.dispatchEvent(new Event('input'));await wait(90);"
+            "result.early=state(c);await wait(300);result.late=state(c);result.asked=window.asked;"
+        )
+        self.assertNotIn("TRA1", result["early"]["rows"])
+        self.assertEqual((result["late"]["rows"], result["late"]["open"]), (["TRA2"], True))
+        self.assertEqual(result["asked"], ["", "TRA2"])
+
 
 class ScriptSourceTests(TestCase):
     def test_no_script_builds_markup_from_text_or_runs_dynamic_code(self):
@@ -148,7 +253,8 @@ class ScriptSourceTests(TestCase):
         self.assertIn("pausedUntil", combobox)
         # L-D: the text is forgotten when the pause starts (twice: the answer, and a search inside the pause), so the
         # same text is searched again afterwards.
-        self.assertEqual(combobox.count('last = "";'), 4)  # two here, the short text and the pause in the input handler
+        # Two here, the short text and the pause in the input handler, and the list from the start (minimum 0).
+        self.assertEqual(combobox.count('last = "";'), 5)
         self.assertRegex(combobox, r'pausedUntil = Date\.now\(\)[^\n]*\n\s*last = "";')
         self.assertIn("messageLimited", combobox)
         directory = (ROOT / "static" / "js" / "address-directory.js").read_text(encoding="utf-8")
@@ -173,6 +279,7 @@ class ScriptSourceTests(TestCase):
         self.assertIn(".error-summary", text)
         self.assertIn("[data-first-field]", text)
         self.assertIn("setSelectionRange", text)  # the cursor at the end of a prefilled value
+        self.assertIn('target.dataset.suggestMinimum === "0"', text)  # a list from the start keeps its text selected
 
     def test_the_checks_use_the_messages_of_the_server_and_never_change_what_was_typed_except_on_leaving_the_field(self):
         text = script("field-check.js")
@@ -359,17 +466,15 @@ class MarkupTests(TestCase):
         self.assertIn("Keine LEG zugeordnet", html)
         self.assertNotIn("Noch keine LEG gewählt", html)
 
-    def test_the_circuit_list_ends_with_the_option_that_creates_a_new_circuit(self):
+    def test_the_circuit_is_a_combobox_that_starts_with_the_automatic_choice(self):
         html = self.page("locations_new")
-        select = re.search(r'<select name="transformer_circuit".*?</select>', html, re.S).group(0)
-        options = re.findall(r'<option value="([^"]*)"[^>]*>(.*?)</option>', select)
-        self.assertEqual(options[0], ("", "Kein Trafokreis"))
-        self.assertEqual(options[1][1], "TRA1 · Eins")
-        self.assertEqual(options[-1], ("__new__", "+ Neuen Trafokreis anlegen …"))
-        # Both fields of the new circuit are always in the page (without a script the server decides).
-        self.assertIn('name="new_circuit_number"', html)
-        self.assertIn('class="mgmt-dialog-row is-circuit-new"', html)
-        self.assertIn("TRA gefolgt von Ziffern, z. B. TRA21359.", html)
+        field = re.search(r'<input[^>]*name="transformer_circuit"[^>]*>', html).group(0)
+        self.assertIn('data-suggest-url="/management/transformer-circuits/search/"', field)
+        self.assertIn('data-suggest-minimum="0"', field)
+        self.assertIn('value="Automatisch (gemäss Netzbetreiber)"', field)
+        # A new circuit is created only in the menu: no field for it, no option for it.
+        self.assertNotIn("new_circuit_number", html)
+        self.assertNotIn("Neuen Trafokreis anlegen", html)
         self.assertNotIn("<datalist", html)
 
     def test_the_person_field_is_a_combobox_with_its_texts_in_the_language_of_the_page(self):

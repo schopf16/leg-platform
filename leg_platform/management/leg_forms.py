@@ -11,7 +11,7 @@ from django.utils.translation import gettext_lazy as _
 
 from leg_platform.community import grid_operator, leg_services, numbers
 from leg_platform.community.models import Direction, LegAssignment, MeteringPoint
-from leg_platform.management.form_fields import DecimalInputField, date_field, remark_field
+from leg_platform.management.form_fields import DecimalInputField, ManagementForm, date_field, remark_field
 
 CONTROL = {"class": "form-control", "autocomplete": "off"}
 
@@ -27,7 +27,7 @@ class PercentField(DecimalInputField):
         super().__init__(**kwargs)
 
 
-class QuotaFields(forms.Form):
+class QuotaFields(ManagementForm):
     """The quota and its date, saved together: a quota needs a date, no quota drops the date, the date is not
     in the future (the page script defaults it to today; the server only requires it)."""
 
@@ -101,14 +101,14 @@ class QuotaForm(QuotaFields):
     optional = ("quota",)
 
 
-class MasterDataForm(NameMixin, forms.Form):
+class MasterDataForm(NameMixin, ManagementForm):
     name = _name_field()
     remark = remark_field()
     layout = [("single", ["name"]), ("single", ["remark"])]
     optional = ("remark",)
 
 
-class LegPointForm(forms.Form):
+class LegPointForm(ManagementForm):
     """"Assign metering point" on the page of a LEG (D-095): one drop-down of the metering points that have no LEG (also
     none planned) and the day it is valid from. A metering point of another LEG is moved with "Change LEG", which
     knows the related points. The choices are built from the database for every request; the service checks again

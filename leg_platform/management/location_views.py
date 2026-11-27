@@ -11,17 +11,18 @@ from types import SimpleNamespace
 
 from django.contrib import messages
 from django.core.exceptions import SuspiciousOperation, ValidationError
-from django.db import IntegrityError
+from django.db.models import Q
 from django.http import Http404, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext as _
-from django.utils.translation import gettext_lazy
+from django.utils.translation import gettext_lazy, ngettext
 from django.views import View
 
 from leg_platform.community import (
     addressing,
+    grid_operator,
     history,
     labels,
     location_list,
@@ -33,16 +34,13 @@ from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import (
     Application,
     ApplicationBuilding,
-    ApplicationMeteringPoint,
     Location,
     PersonAssignment,
-    TransformerCircuit,
 )
-from leg_platform.management import lists, pending
+from leg_platform.management import circuit_forms, lists, pending
 from leg_platform.management.access import ManagementAccessMixin
 from leg_platform.management.location_forms import (
     AddressEditForm,
-    CircuitForm,
     LocationCircuitForm,
     LocationCreateForm,
     RemarkForm,
@@ -74,13 +72,53 @@ def count_phrase(count):
     return _("1 metering point") if count == 1 else _("%(count)d metering points") % {"count": count}
 
 
+def list_count_phrase(location):
+    """The column "Metering points" of the list (D-140): the stored points and those in registration there, e.g.
+    "2 metering points (1 in registration)"."""
+    text = count_phrase(location.point_count)
+    if location.pending_count:
+        text += " " + _("(%(count)d in registration)") % {"count": location.pending_count}
+    return text
+
+
+def pending_phrase(location):
+    """The second line of the column "Metering points" in the list, e.g. "1 in registration" ("" without such points)."""
+    if not location.pending_count:
+        return ""
+    return _("%(count)d in registration") % {"count": location.pending_count}
+
+
+def circuit_url(location):
+    """The page of the circuit of a location (D-142), "" without a circuit."""
+    if not location.transformer_circuit_id:
+        return ""
+    return reverse("management:circuits_detail", args=[location.transformer_circuit_id])
+
+
 def occupancy_phrase(metering_point_count, persons):
-    """"empty", "free" or the number of persons."""
-    if metering_point_count == 0:
-        return _("empty")
+    """"empty", "free" or the number of persons (on the list also the applicants of points in registration there)."""
     if persons == 0:
-        return _("free")
+        return _("empty") if metering_point_count == 0 else _("free")
     return _("1 person") if persons == 1 else _("%(count)d persons") % {"count": persons}
+
+
+def counted_phrases(location_ids, today):
+    """``{location id: "<points> · <occupancy>"}`` counted like the list (D-140): the stored points and those in
+    registration there ("2 metering points (2 in registration)"), the persons and the applicants, each person once.
+    The subtitle of the detail page and of its print."""
+    ids = set(location_ids)
+    pending = {
+        pk: here
+        for pk, here in location_list.pending_at_locations(location_list.folded_buildings()).items()
+        if pk in ids
+    }
+    counted = location_list.base_queryset(today, pending).filter(pk__in=ids)
+    return {
+        location.pk: " · ".join(
+            [list_count_phrase(location), occupancy_phrase(location.point_count, location.occupant_count)]
+        )
+        for location in counted
+    }
 
 
 def circuit_phrase(location):
@@ -93,6 +131,16 @@ def event_label(event):
         return HistoryEvent(event).label
     except ValueError:
         return event
+
+
+def history_actor(entry):
+    """The column "By" of a history entry: the account, or "automatically (BKW)" for a change of the automatic circuit
+    derivation without an account (``detail["derived"]``, D-142), else ""."""
+    if entry.actor_id:
+        return entry.actor.display_name
+    if isinstance(entry.detail, dict) and entry.detail.get("derived"):
+        return _("automatically (%(operator)s)") % {"operator": grid_operator.name()}
+    return ""
 
 
 class ListWidthsView(ManagementAccessMixin, View):
@@ -128,30 +176,36 @@ def _pending_point(point, application, request):
     }
 
 
-def pending_points_by_location(request, location_ids):
-    """The metering points of applications in flight at a stored location ("add a metering point"), by location."""
+def pending_points_by_location(request, location_ids, folded):
+    """The metering points of applications in flight at a stored location, by location: those of a building linked to
+    it ("add a metering point") and those of a new building with its EGID or address (``folded``, from
+    ``location_list.folded_buildings``). They belong to the location wherever it appears (any page, any filter)."""
+    wanted = set(location_ids)
+    folded_here = [building_id for building_id, location_id in folded.items() if location_id in wanted]
     found = (
-        ApplicationMeteringPoint.objects.filter(
-            building__application__state__in=Application.CORRECTABLE_STATES, metering_point__isnull=True,
-            building__location_id__in=location_ids,
-        )
+        location_list.pending_points()
+        .filter(Q(building__location_id__in=wanted) | Q(building_id__in=folded_here))
         .select_related("building__application__person")
         .order_by("number", "pk")
     )
     rows = {}
     for point in found:
-        rows.setdefault(point.building.location_id, []).append(_pending_point(point, point.building.application, request))
+        location_id = point.building.location_id or folded[point.building_id]
+        rows.setdefault(location_id, []).append(_pending_point(point, point.building.application, request))
     return rows
 
 
 PENDING_OFFSET = 1_000_000_000  # the expand id of a building in registration: offset plus the building's pk
 
 
-def pending_entries(request, state, expanded):
-    """The new buildings of applications in flight (no stored location yet) as entries of the list, at most
-    ``pending.MAX_ROWS``; returns ``(entries, more)`` (``more``: the line to the processes for the rest, or None)."""
+def pending_entries(request, state, expanded, folded):
+    """The new buildings of applications in flight that match no stored location (``folded`` are shown under theirs) as
+    entries of the list, at most ``pending.MAX_ROWS``; returns ``(entries, more)`` (``more``: the line to the processes
+    for the rest, or None)."""
     buildings = pending._search(
-        ApplicationBuilding.objects.filter(application__state__in=Application.CORRECTABLE_STATES, location__isnull=True),
+        ApplicationBuilding.objects.filter(
+            application__state__in=Application.CORRECTABLE_STATES, location__isnull=True
+        ).exclude(pk__in=list(folded)),
         state.query, number="metering_points__number", person="application__person__",
         places=("street", "house_number", "postal_code", "town", "name"),
     ).distinct()
@@ -226,6 +280,7 @@ class LocationList:
     today: object
     problem_count: int
     queryset: object
+    folded: dict
 
 
 def build_list(params):
@@ -238,7 +293,10 @@ def build_list(params):
             "occupancy": ([value for value, _text in occupancy_options()], location_list.OCCUPANCY_ALL),
         },
     )
-    queryset = location_list.apply_search(location_list.base_queryset(today), state.query, today=today)
+    # A new building of an application with the EGID or address of a stored location is shown under it (D-140).
+    folded = location_list.folded_buildings()
+    queryset = location_list.base_queryset(today, location_list.pending_at_locations(folded))
+    queryset = location_list.apply_search(queryset, state.query, today=today, folded=folded)
     queryset = location_list.apply_circuit(queryset, state.values["circuit"])
     queryset = location_list.apply_occupancy(queryset, state.values["occupancy"])
     # The problem button counts the entries with a problem in the current view.
@@ -246,7 +304,7 @@ def build_list(params):
     if state.problems:
         queryset = location_list.apply_problems(queryset)
     queryset = location_list.apply_sort(queryset, state.sort, state.descending)
-    return LocationList(state, COLUMNS, circuits, today, problem_count, queryset)
+    return LocationList(state, COLUMNS, circuits, today, problem_count, queryset, folded)
 
 
 class LocationListView(ManagementAccessMixin, View):
@@ -257,11 +315,11 @@ class LocationListView(ManagementAccessMixin, View):
         state, circuits, today = found.state, found.circuits, found.today
         problem_count = found.problem_count
         page = lists.paginate(found.queryset, state)
-        rows, persons = location_list.details(page.items, today)
+        rows, _persons = location_list.details(page.items, today)  # the occupancy is ``occupant_count`` (D-140)
         expanded = set(preferences.get_preference(request.user, "locations").expanded_locations)
 
         entries = []
-        in_registration = pending_points_by_location(request, [location.pk for location in page.items])
+        in_registration = pending_points_by_location(request, [location.pk for location in page.items], found.folded)
         for location in page.items:
             points = list(rows[location.pk]) + in_registration.get(location.pk, [])
             entries.append(
@@ -271,22 +329,30 @@ class LocationListView(ManagementAccessMixin, View):
                     "is_open": bool(points) and location.pk in expanded,
                     "can_open": bool(points),
                     "circuit": circuit_phrase(location),
-                    "count_phrase": count_phrase(location.mp_count),
-                    "occupancy": occupancy_phrase(location.mp_count, persons[location.pk]),
-                    "persons": persons[location.pk],
+                    "circuit_url": circuit_url(location),
+                    "count_phrase": list_count_phrase(location),
+                    "count_main": count_phrase(location.point_count),
+                    "count_pending": pending_phrase(location),
+                    "occupancy": occupancy_phrase(location.point_count, location.occupant_count),
                     "detail_url": reverse("management:locations_detail", args=[location.pk]),
                 }
             )
-        pending_more = None
+        pending_more, extra = None, []
         if page.page == 1 and not state.filtered:
-            # The buildings of applications ignore the filters and the pages: only in the default view, on its first page.
-            extra, pending_more = pending_entries(request, state, expanded)
+            # The new buildings of applications ignore the filters and the pages: only in the default view, on its first
+            # page. Those of a stored location are among its metering points (``pending_points_by_location``).
+            extra, pending_more = pending_entries(request, state, expanded, found.folded)
             entries = merge_pending(entries, extra, state)
         openable = [entry for entry in entries if entry["can_open"]]
         all_open = bool(openable) and all(entry["is_open"] for entry in openable)
         count_text = _("%(first)d–%(last)d of %(total)d locations") % {
             "first": page.first, "last": page.last, "total": page.total,
         }
+        if extra:
+            # The rows of new buildings are no locations yet: counted apart, so the line matches the rows shown.
+            count_text += " " + ngettext(
+                "+ %(count)d building in registration", "+ %(count)d buildings in registration", len(extra)
+            ) % {"count": len(extra)}
         context = lists.list_context(
             request, "locations", found.columns, state, page, count_text=count_text,
             widths_url=reverse("management:list_widths", args=["locations"]),
@@ -361,7 +427,7 @@ class LocationDetailView(ManagementAccessMixin, View):
         location = get_object_or_404(Location.objects.select_related("transformer_circuit"), pk=pk)
         user = request.user
         today = timezone.localdate()
-        rows, persons = location_list.details([location], today)
+        rows, _persons = location_list.details([location], today)
         points = rows[location.pk]
         can_change = not location.is_archived  # D-085: an archived location is read-only
         deletable = locations.can_delete(location)
@@ -375,10 +441,12 @@ class LocationDetailView(ManagementAccessMixin, View):
             "page_title": f"{location.street} {location.house_number}",
             "location": location,
             "points": points,
-            "subtitle": " · ".join(
-                [circuit_phrase(location), count_phrase(len(points)), occupancy_phrase(len(points), persons[location.pk])]
-            ),
+            # The subtitle: the circuit (linked to its page, D-142), then "<points> · <occupancy>" counted like the list.
+            "subtitle_circuit": circuit_phrase(location),
+            "subtitle_circuit_url": circuit_url(location),
+            "subtitle": counted_phrases([location.pk], today)[location.pk],
             "circuit": circuit,
+            "circuit_automatic": not location.circuit_manual,
             "circuit_stats": transformer_circuits.stats(circuit) if circuit else None,
             "show_new": request.GET.get("new") == "1" and can_change,
             "assignment_history": [
@@ -391,7 +459,7 @@ class LocationDetailView(ManagementAccessMixin, View):
                 for a in assignments
             ],
             "history": [
-                {"time": e.created_at, "label": event_label(e.event), "actor": e.actor.display_name if e.actor_id else ""}
+                {"time": e.created_at, "label": event_label(e.event), "actor": history_actor(e)}
                 for e in history.entries_for(location).order_by("-created_at", "-pk")
             ],
             "back_url": return_url(request, reverse("management:locations")),
@@ -464,8 +532,7 @@ class DialogView(ManagementAccessMixin, View):
 
 
 class LocationCreateView(DialogView):
-    """The dialog "Create location": the address, the transformer circuit (chosen, or a new one entered in the same
-    form and saved with the location in one transaction) and the remark (D-095). Afterwards the page of the new location
+    """The dialog "Create location": the address, the transformer circuit (automatic or chosen, D-142) and the remark. Afterwards the page of the new location
     opens with the next steps; if the dialog came from the form "Create metering point", that form opens again with
     the new location chosen."""
 
@@ -493,14 +560,14 @@ class LocationCreateView(DialogView):
         try:
             location = locations.create_location(
                 **form.address(), address_addition=form.cleaned_data["address_addition"],
-                transformer_circuit=form.cleaned_data["transformer_circuit"], new_circuit=form.new_circuit,
+                transformer_circuit=form.cleaned_data["transformer_circuit"], station=form.circuit_station,
                 remark=form.cleaned_data["remark"], actor=request.user,
             )
-        except ValidationError as error:
-            if hasattr(error, "error_dict") and {"grid_number", "name"} & set(error.error_dict):
-                form.circuit_errors(error)
-            else:
-                form.add_error(None, _("This address already exists."))
+        except locations.CircuitUnknown:
+            form.add_error("transformer_circuit", circuit_forms.UNKNOWN_MESSAGE)
+            return None
+        except ValidationError:
+            form.add_error(None, _("This address already exists."))
             return None
         back = self.back(request)
         if view_name_of(back) in ("management:metering_points_new", "management:metering_points_edit"):
@@ -619,76 +686,30 @@ class LocationRemarkView(LocationObjectDialog):
 
 
 class LocationCircuitView(LocationObjectDialog):
-    """"Change transformer circuit" at a location: the same fields as in the form "Create location" (a drop-down of the
-    existing circuits whose last option creates a new one, saved with the change in one transaction, D-095)."""
+    """"Choose transformer circuit" at a location: the same field as in the form "Create location" (D-142)."""
 
-    title = gettext_lazy("Change transformer circuit")
+    title = gettext_lazy("Choose transformer circuit")
     form_class = LocationCircuitForm
 
     def get_form(self, data=None):
         return LocationCircuitForm(data, location=self.location())
 
     def get_lead(self):
-        return _("Choose the transformer circuit of the location %(address)s or create a new one.") % {
-            "address": f"{self.location().street} {self.location().house_number}"
-        }
+        location = self.location()
+        return _(
+            "Choose the transformer circuit of the location %(address)s. “Automatic” takes it from the %(operator)s data."
+        ) % {"address": f"{location.street} {location.house_number}", "operator": grid_operator.name()}
 
     def save(self, request, form):
         try:
             locations.set_circuit(
-                self.location(), form.cleaned_data["transformer_circuit"], request.user, new_circuit=form.new_circuit
+                self.location(), form.cleaned_data["transformer_circuit"], request.user, station=form.circuit_station
             )
-        except ValidationError as error:
-            if hasattr(error, "error_dict"):
-                form.circuit_errors(error)
-            else:
-                form.add_error(None, _("The data could not be saved."))
+        except locations.CircuitUnknown:
+            form.add_error("transformer_circuit", circuit_forms.UNKNOWN_MESSAGE)
             return None
         except locations.Archived:
             return archived_redirect(request, self.kwargs["pk"])
-        messages.success(request, _("Saved."))
-        return redirect(self.back(request))
-
-
-class CircuitEditView(DialogView):
-    """Change name or number of a circuit; it reaches every location with it (the dialog says how many)."""
-
-    title = gettext_lazy("Edit transformer circuit")
-    form_class = CircuitForm
-    template_name = "management/dialog_form.html"
-
-    def circuit(self):
-        return get_object_or_404(TransformerCircuit, pk=self.kwargs["pk"])
-
-    def get_form(self, data=None):
-        circuit = self.circuit()
-        return CircuitForm(data, circuit=circuit, initial={"grid_number": circuit.grid_number, "name": circuit.name})
-
-    def get_lead(self):
-        count = transformer_circuits.affected_locations(self.circuit())
-        if count == 1:
-            return _("The change reaches 1 location.")
-        return _("The change reaches %(count)d locations.") % {"count": count}
-
-    def save(self, request, form):
-        if form.existing is not None:
-            form.add_error("grid_number", _("This transformer circuit already exists."))
-            return None
-        try:
-            transformer_circuits.update(self.circuit(), form.cleaned_data["grid_number"], form.cleaned_data["name"])
-        except ValidationError as error:
-            # A parallel change took the number after the form check (full_clean under the lock or the constraint).
-            if not hasattr(error, "error_dict"):
-                form.add_error(None, _("The data could not be saved."))
-            for key, errors in getattr(error, "error_dict", {}).items():
-                if key == "grid_number" and any(item.code == "unique" for item in errors):
-                    form.add_error("grid_number", _("This transformer circuit already exists."))
-                else:
-                    form.add_error(key if key in form.fields else None, errors)
-            return None
-        except IntegrityError:
-            form.add_error("grid_number", _("This transformer circuit already exists."))
-            return None
         messages.success(request, _("Saved."))
         return redirect(self.back(request))
 

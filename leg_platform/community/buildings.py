@@ -203,6 +203,32 @@ def existing_location(egid, address):
     return by_egid or Location.find_by_address(*address)
 
 
+def existing_locations(wanted):
+    """``existing_location`` for many buildings in one query: ``wanted`` maps a key to ``(egid, address)``; returns
+    ``{key: location}`` for the keys a stored location matches (archived ones too: ``usable`` decides)."""
+    if not wanted:
+        return {}
+    digests = {key: addressing.address_digest(*address) for key, (_egid, address) in wanted.items()}
+    egids = {egid for egid, _address in wanted.values() if egid is not None}
+    by_egid, by_digest = {}, {}
+    for location in Location.objects.filter(Q(egid__in=egids) | Q(address_digest__in=set(digests.values()))):
+        if location.egid is not None:
+            by_egid[location.egid] = location
+        by_digest[location.address_digest] = location
+    found = {}
+    for key, (egid, _address) in wanted.items():
+        location = (by_egid.get(egid) if egid is not None else None) or by_digest.get(digests[key])
+        if location is not None:
+            found[key] = location
+    return found
+
+
+def usable(location, egid):
+    """Whether a building with this EGID may be attached to the stored location: not archived, and no EGID that
+    contradicts the location's (the rule of ``resolve`` and of the completion)."""
+    return not location.is_archived and not (egid is not None and location.egid is not None and location.egid != egid)
+
+
 def resolve(person, egid, address):
     """``(location or None, existing)`` for a building the person wants: a stored location is always attached to (a
     building is shared by all its customers, whoever else uses it); ``None`` for a new building. Raises ``Refusal`` only
@@ -211,7 +237,7 @@ def resolve(person, egid, address):
     location = existing_location(egid, address)
     if location is None:
         return None, False
-    if location.is_archived or (egid is not None and location.egid is not None and location.egid != egid):
+    if not usable(location, egid):
         raise Refusal(ApplicationNoticeKind.BUILDING_UNAVAILABLE, egid=egid)
     return location, True
 

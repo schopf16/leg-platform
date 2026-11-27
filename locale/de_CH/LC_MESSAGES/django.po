@@ -3934,9 +3934,6 @@ msgstr "Übertragen und speichern"
 msgid "Edit remark"
 msgstr "Bemerkung bearbeiten"
 
-msgid "Change transformer circuit"
-msgstr "Trafokreis ändern"
-
 msgid "The change reaches 1 location."
 msgstr "Die Änderung betrifft 1 Standort."
 
@@ -4076,9 +4073,6 @@ msgstr "PLZ, Ort"
 
 msgid "Grid"
 msgstr "Netz"
-
-msgid "Edit transformer circuit"
-msgstr "Trafokreis bearbeiten"
 
 msgid "Locations in the transformer circuit"
 msgstr "Standorte im Trafokreis"
@@ -5311,23 +5305,6 @@ msgstr ""
 msgid "No metering point chosen yet"
 msgstr "Noch kein Messpunkt gewählt"
 
-msgid "No transformer circuit"
-msgstr "Kein Trafokreis"
-
-msgid "+ Create new transformer circuit…"
-msgstr "+ Neuen Trafokreis anlegen …"
-
-msgid "Choose an existing transformer circuit or enter a new one, not both."
-msgstr ""
-"Wählen Sie einen bestehenden Trafokreis oder geben Sie einen neuen ein, "
-"nicht beides."
-
-msgid "Enter the %(operator)s number."
-msgstr "Geben Sie die Nummer von %(operator)s ein."
-
-msgid "This transformer circuit already exists. Choose it from the list."
-msgstr "Dieser Trafokreis existiert bereits. Wählen Sie ihn in der Liste."
-
 msgid "TRA followed by digits, for example TRA21359."
 msgstr "TRA gefolgt von Ziffern, z. B. TRA21359."
 
@@ -5404,13 +5381,6 @@ msgstr ""
 
 msgid "This location does not exist any more."
 msgstr "Diesen Standort gibt es nicht mehr."
-
-msgid ""
-"Choose the transformer circuit of the location %(address)s or create a new "
-"one."
-msgstr ""
-"Wählen Sie den Trafokreis des Standorts %(address)s oder legen Sie einen "
-"neuen an."
 
 msgid ""
 "Choose a metering point that has no LEG yet. It is assigned to the LEG "
@@ -10461,3 +10431,149 @@ msgstr "Konfiguration des Swisseldex Datahub geändert"
 
 msgid "Swisseldex Datahub connection tested"
 msgstr "Verbindung zum Swisseldex Datahub getestet"
+
+#, python-format
+msgid "+ %(count)d building in registration"
+msgid_plural "+ %(count)d buildings in registration"
+msgstr[0] "+ %(count)d Gebäude in Anmeldung"
+msgstr[1] "+ %(count)d Gebäude in Anmeldung"
+
+msgid "The applicants of metering points in registration count too."
+msgstr "Die Antragstellenden von Messpunkten in Anmeldung zählen mit."
+
+#, python-format
+msgid "%(count)d day"
+msgid_plural "%(count)d days"
+msgstr[0] "%(count)d Tag"
+msgstr[1] "%(count)d Tage"
+
+# Transformer circuits: menu, list, detail, the circuit field of a location (D-142)
+#, python-format
+msgid "Automatic (according to %(operator)s)"
+msgstr "Automatisch (gemäss %(operator)s)"
+
+#, python-format
+msgid "automatically (%(operator)s)"
+msgstr "automatisch (%(operator)s)"
+
+msgid "manual"
+msgstr "von Hand"
+
+msgid "unknown"
+msgstr "unbekannt"
+
+msgid "Source:"
+msgstr "Quelle:"
+
+msgid "No transformer circuit found."
+msgstr "Kein Trafokreis gefunden."
+
+msgid "This transformer circuit does not exist. Create it in the menu “Transformer circuits”."
+msgstr "Diesen Trafokreis gibt es nicht. Legen Sie ihn im Menü «Trafokreise» an."
+
+msgid "Search by number or name. A new transformer circuit is created in the menu “Transformer circuits”."
+msgstr "Nach Nummer oder Name suchen. Einen neuen Trafokreis legen Sie im Menü «Trafokreise» an."
+
+msgid "Choose transformer circuit"
+msgstr "Trafokreis wählen"
+
+#, python-format
+msgid "Choose the transformer circuit of the location %(address)s. “Automatic” takes it from the %(operator)s data."
+msgstr "Wählen Sie den Trafokreis des Standorts %(address)s. «Automatisch» übernimmt ihn aus den Daten von %(operator)s."
+
+msgid "Chosen by hand"
+msgstr "Von Hand gewählt"
+
+#, python-format
+msgid "(%(count)d in registration)"
+msgstr "(%(count)d in Anmeldung)"
+
+#, python-format
+msgid "%(count)d in registration"
+msgstr "%(count)d in Anmeldung"
+
+msgid "Metering points of the transformer circuit that belong to a LEG, of all, for example 3 of 4."
+msgstr "Messpunkte des Trafokreises, die zu einer LEG gehören, von allen, z. B. 3 von 4."
+
+#, python-format
+msgid "%(operator)s: the number is a transformer station in the %(operator)s data of the address directory. Manual: entered by hand."
+msgstr "%(operator)s: Die Nummer ist eine Trafostation in den Daten von %(operator)s im Adressverzeichnis. Von Hand: selbst erfasst."
+
+#, python-format
+msgid "%(part)d of %(total)d"
+msgstr "%(part)d von %(total)d"
+
+#, python-format
+msgid "%(first)d–%(last)d of %(total)d transformer circuits"
+msgstr "%(first)d–%(last)d von %(total)d Trafokreisen"
+
+msgid "The transformer circuits with their locations, metering points and LEGs."
+msgstr "Die Trafokreise mit ihren Standorten, Messpunkten und LEGs."
+
+msgid "No transformer circuits yet."
+msgstr "Noch keine Trafokreise."
+
+msgid "No transformer circuits found."
+msgstr "Keine Trafokreise gefunden."
+
+msgid "no locations"
+msgstr "keine Standorte"
+
+msgid "1 location"
+msgstr "1 Standort"
+
+#, python-format
+msgid "%(count)d locations"
+msgstr "%(count)d Standorte"
+
+msgid "Create transformer circuit"
+msgstr "Trafokreis anlegen"
+
+#, python-format
+msgid "A transformer circuit of the %(operator)s grid. Afterwards it can be chosen at the locations."
+msgstr "Ein Trafokreis im Netz von %(operator)s. Danach kann er bei den Standorten gewählt werden."
+
+msgid "Rename transformer circuit"
+msgstr "Trafokreis umbenennen"
+
+msgid "Number, name or LEG"
+msgstr "Nummer, Name oder LEG"
+
+msgid "Go to the transformer circuit"
+msgstr "Zum Trafokreis"
+
+msgid "Back to transformer circuits"
+msgstr "Zurück zu den Trafokreisen"
+
+msgid "Transformer circuit created. Next: choose it at the locations."
+msgstr "Trafokreis angelegt. Weiter: bei den Standorten wählen."
+
+msgid "Rename"
+msgstr "Umbenennen"
+
+msgid "Number"
+msgstr "Nummer"
+
+msgid "Figures"
+msgstr "Zahlen"
+
+msgid "In a LEG"
+msgstr "In einer LEG"
+
+msgid "Not in a LEG"
+msgstr "In keiner LEG"
+
+msgid "No locations in this transformer circuit."
+msgstr "Keine Standorte in diesem Trafokreis."
+
+msgid "In this transformer circuit"
+msgstr "In diesem Trafokreis"
+
+msgid "In total"
+msgstr "Insgesamt"
+
+msgid "No LEG has metering points in this transformer circuit."
+msgstr "Keine LEG hat Messpunkte in diesem Trafokreis."
+
+msgid "Metering points of the LEG in this transformer circuit and in total."
+msgstr "Messpunkte der LEG in diesem Trafokreis und insgesamt."

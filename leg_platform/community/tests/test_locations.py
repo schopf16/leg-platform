@@ -334,14 +334,12 @@ class TransformerCircuitServiceTests(TestCase):
                 transformer_circuits.create("tra21359", "Parallel")
         self.assertIn("grid_number", caught.exception.message_dict)
         self.assertEqual(type(self.circuit).objects.filter(grid_number="TRA21359").count(), 1)
-        # Inside the transaction of a location nothing is kept either (the savepoint rolled back).
-        with mock.patch.object(type(self.circuit), "full_clean"), NO_SUGGESTION:
-            with self.assertRaises(ValidationError):
-                locations.create_location(
-                    street="Raceweg", house_number="1", postal_code="3063", town="Ittigen",
-                    new_circuit=("TRA21359", "Parallel"),
-                )
-        self.assertFalse(Location.objects.filter(street="Raceweg").exists())
+        # A station chosen while another request stores its circuit: that circuit is used, no error, no second row.
+        with mock.patch.object(type(self.circuit), "full_clean"), mock.patch.object(
+            transformer_circuits, "find", side_effect=[None, self.circuit]
+        ):
+            self.assertEqual(transformer_circuits.find_or_create("TRA21359"), self.circuit)
+        self.assertEqual(type(self.circuit).objects.filter(grid_number="TRA21359").count(), 1)
 
     def test_a_change_reaches_every_location_and_may_not_take_another_number(self):
         self.assertEqual(transformer_circuits.affected_locations(self.circuit), 3)
@@ -470,6 +468,15 @@ class LocationListQueryTests(TestCase):
         self.assertEqual(run("quartier"), ["Bahnhofstrasse 10"])
         self.assertEqual(run("secretword"), [])
         self.assertEqual(len(run("")), 5)
+
+    def test_the_search_uses_the_first_five_words_only(self):
+        # L-4: every word adds LIKE conditions; a sixth word is ignored (as in the person search and the circuit list).
+        def run(text):
+            return sorted(self.names(location_list.apply_search(self.base(), text, today=self.TODAY)))
+
+        self.assertEqual(location_list.MAX_WORDS, 5)
+        self.assertEqual(run("bahnhof 9 bahnhof 9 bahnhof secretword"), ["Bahnhofstrasse 9", "Bahnhofstrasse 9a"])
+        self.assertEqual(run("bahnhof 9 bahnhof 9 secretword"), [])
 
     def test_persons_are_found_by_name_while_their_assignment_is_not_ended(self):
         def run(text):

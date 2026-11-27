@@ -23,6 +23,7 @@ from leg_platform.community.models import (
 from leg_platform.management.form_fields import (
     CheckedInput,
     DecimalInputField,
+    ManagementForm,
     NotedSelect,
     SegmentedChoiceField,
     date_field,
@@ -51,7 +52,7 @@ def move_note(old, new):
     ) % {"old": old, "new": new}
 
 
-class MeteringPointForm(forms.Form):
+class MeteringPointForm(ManagementForm):
     """Create or change a metering point (the one form of this subject).
 
     Fields in order: location, number, direction, then "Optional": LEG, PV power, battery, wallbox, remark. The number
@@ -213,7 +214,7 @@ class MeteringPointForm(forms.Form):
         }
 
 
-class DialogForm(forms.Form):
+class DialogForm(ManagementForm):
     layout = []
     optional = ()
     hint = ""

@@ -64,7 +64,7 @@ history) or "Archive LEG"; on a phone it stands at the end of the page.
           <div class="mgmt-fact"><dt>{% translate "Discount tier" %}{% translate "Discount tier" as tier_name %}{% blocktranslate asvar tier_info with name=tier_name %}Information: {{ name }}{% endblocktranslate %}<span class="mgmt-info mgmt-desktop-only"><button type="button" class="mgmt-info-btn" aria-label="{{ tier_info }}" aria-describedby="tip-leg-tier">i</button><span class="mgmt-tip" role="tooltip" id="tip-leg-tier">{% include "management/legs/_tip_tier.html" %}</span></span></dt>
             <dd>{% if has_tier %}{% include "management/_status.html" with tone=tier_tone label=tier_label %}{% else %}–{% endif %}</dd></div>
           <div class="mgmt-fact mgmt-phone-only-row"><dd class="mgmt-hint mgmt-span">{% translate "Derived from the transformer circuits of the metering points." %} {% blocktranslate %}The {{ operator }} determines the actual discount.{% endblocktranslate %}</dd></div>
-          <div class="mgmt-fact"><dt>{% translate "Transformer circuits" %}</dt><dd class="tnum">{% if circuits %}<span class="mgmt-desktop-only">{% for circuit in circuits %}<span class="mgmt-tag">{{ circuit }}</span>{% endfor %}</span><span class="mgmt-phone-only">{{ circuits|join:", " }}</span>{% else %}–{% endif %}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Transformer circuits" %}</dt><dd class="tnum">{% if circuits %}<span class="mgmt-desktop-only">{% for circuit in circuits %}<a class="mgmt-tag" href="{{ circuit.url }}">{{ circuit.number }}</a>{% endfor %}</span><span class="mgmt-phone-only">{% for circuit in circuits %}<a href="{{ circuit.url }}">{{ circuit.number }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</span>{% else %}–{% endif %}</dd></div>
         </dl>
       </section>
     </div>
@@ -73,7 +73,7 @@ history) or "Archive LEG"; on a phone it stands at the end of the page.
   <section class="mgmt-card mgmt-card-flush">
       <div class="mgmt-card-head mgmt-card-pad"><h2>{% translate "Metering points of this LEG" %}</h2><span class="mgmt-card-buttons">{% if can_change %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:legs_metering_point_assign' leg.pk %}">{% translate "Assign metering point" %}</a>{% endif %}<span class="mgmt-count mgmt-desktop-only">{{ count_text }}</span></span></div>
       <div class="mgmt-list" data-list data-list-key="leg_metering_points" data-widths-url="{{ member_widths_url }}" data-csrf="{{ csrf_token }}" data-min-width="90">
-        <div class="mgmt-table-view">
+        <div class="mgmt-table-view mgmt-members-view">
           <table class="mgmt-table mgmt-table-fixed mgmt-members">
             <colgroup>
               {% for column in member_columns %}<col data-col="{{ column.key }}"{% if column.width %} width="{{ column.width }}"{% endif %}{% if column.keep %} data-keep{% endif %}>
@@ -97,7 +97,7 @@ history) or "Archive LEG"; on a phone it stands at the end of the page.
                 <tr>
                   <td><div class="mgmt-nr-row">{% if point.number %}<span class="mgmt-nr">{{ point.number|metering_point }}</span>{% else %}<span class="mgmt-muted">–</span>{% endif %}{% include "management/_direction.html" with direction=point.direction %}</div></td>
                   <td>{% if row.address %}<span class="mgmt-cut-inline" title="{{ row.address }}">{{ row.address }}</span>{% if row.location_url %}{% translate "Go to the location" as location_label %}{% include "management/_goto.html" with url=row.location_url label=location_label %}{% endif %}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
-                  <td class="tnum">{% if member.circuit %}{{ member.circuit }}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
+                  <td class="tnum">{% if member.circuit %}<span class="mgmt-cut-inline" title="{{ member.circuit }}">{{ member.circuit }}</span>{% if row.circuit_url %}{% translate "Go to the transformer circuit" as circuit_label %}{% include "management/_goto.html" with url=row.circuit_url label=circuit_label subject=member.circuit %}{% endif %}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
                   <td>{% include "management/_status.html" with tone=member.status|status_tone label=member.status|status_label %}</td>
                   <td>{% if row.has_person %}{% if row.occupant %}<div class="mgmt-cut" title="{{ row.occupant }}">{{ row.occupant }}</div>{% else %}<span class="mgmt-muted">–</span>{% endif %}{% else %}{% translate "no person" as missing_person %}{% include "management/_missing.html" with text=missing_person %}{% endif %}</td>
                   <td class="mgmt-action-col">{% include "management/legs/_member_action.html" %}</td>
@@ -117,7 +117,7 @@ history) or "Archive LEG"; on a phone it stands at the end of the page.
             <div class="mgmt-mp">
               <div class="mgmt-mp-nr">{% if point.number %}{{ point.number|metering_point }}{% else %}–{% endif %}{% include "management/_direction.html" with direction=point.direction %}{% translate "Go to the details of the metering point" as point_label %}{% include "management/_goto.html" with url=row.point_url label=point_label subject=point.number|metering_point_text %}</div>
               <div class="mgmt-mp-address">{% if row.address %}{{ row.address }}{% if row.location_url %}{% translate "Go to the location" as location_label %}{% include "management/_goto.html" with url=row.location_url label=location_label %}{% endif %}{% else %}–{% endif %}</div>
-              <div class="mgmt-mp-person">{% if member.circuit %}{{ member.circuit }}{% else %}–{% endif %} · {% if row.has_person %}{% if row.occupant %}{{ row.occupant }}{% else %}–{% endif %}{% else %}{% translate "no person" as missing_person %}{% include "management/_missing.html" with text=missing_person %}{% endif %}</div>
+              <div class="mgmt-mp-person">{% if member.circuit %}{{ member.circuit }}{% if row.circuit_url %}{% translate "Go to the transformer circuit" as circuit_label %}{% include "management/_goto.html" with url=row.circuit_url label=circuit_label subject=member.circuit %}{% endif %}{% else %}–{% endif %} · {% if row.has_person %}{% if row.occupant %}{{ row.occupant }}{% else %}–{% endif %}{% else %}{% translate "no person" as missing_person %}{% include "management/_missing.html" with text=missing_person %}{% endif %}</div>
               <div class="mgmt-mp-line">{% include "management/_status.html" with tone=member.status|status_tone label=member.status|status_label %}<span class="mgmt-mp-action">{% include "management/legs/_member_action.html" %}</span></div>
             </div>
             {% endwith %}

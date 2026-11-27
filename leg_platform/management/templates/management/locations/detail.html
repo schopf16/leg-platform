@@ -20,7 +20,7 @@ notice and "Confirm address" first.
   <div class="mgmt-header mgmt-detail-header">
     <div>
       <h1 class="start-title">{{ page_title }}{% if location.is_archived %} <span class="mgmt-new">{% translate "archived" %}</span>{% endif %}</h1>
-      <p class="mgmt-subtitle">{{ subtitle }}</p>
+      <p class="mgmt-subtitle">{% if subtitle_circuit_url %}<a class="tnum" href="{{ subtitle_circuit_url }}?next={{ current_url|urlencode:'' }}">{{ subtitle_circuit }}</a>{% else %}{{ subtitle_circuit }}{% endif %} · {{ subtitle }}</p>
     </div>
     <div class="mgmt-header-actions">
       {% if location.needs_confirmation and can_change %}
@@ -60,12 +60,12 @@ notice and "Confirm address" first.
 
     <div class="mgmt-col">
       <section class="mgmt-card">
-        <div class="mgmt-card-head"><h2>{% translate "Grid" %}</h2>{% if can_change %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:locations_circuit' location.pk %}">{% translate "Edit" %}</a>{% endif %}</div>
+        <div class="mgmt-card-head"><h2>{% translate "Grid" %}</h2>{% if can_change %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:locations_circuit' location.pk %}">{% translate "Choose transformer circuit" %}</a>{% endif %}</div>
         <dl class="mgmt-facts">
           <div class="mgmt-fact"><dt>{% translate "Transformer circuit" %}</dt>
             <dd>
-              {% if circuit %}<span class="tnum">{{ circuit.grid_number }}</span>{% if circuit.name %} · {{ circuit.name }}{% endif %}{% else %}–{% endif %}
-              {% if circuit %}<p class="mgmt-circuit-links"><a href="{% url 'management:circuits_edit' circuit.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit transformer circuit" %}</a></p>{% endif %}
+              {% if circuit %}<a class="tnum" href="{% url 'management:circuits_detail' circuit.pk %}?next={{ current_url|urlencode:'' }}">{{ circuit.grid_number }}</a>{% if circuit.name %} · {{ circuit.name }}{% endif %}{% else %}–{% endif %}
+              <p class="mgmt-hint">{% if circuit_automatic %}{% operator_name as operator %}{% blocktranslate %}Automatic (according to {{ operator }}){% endblocktranslate %}{% else %}{% translate "Chosen by hand" %}{% endif %}</p>
             </dd>
           </div>
           <div class="mgmt-fact"><dt>{% translate "Locations in the transformer circuit" %}</dt><dd class="tnum mgmt-num">{% if circuit_stats %}{{ circuit_stats.locations }}{% else %}–{% endif %}</dd></div>

@@ -192,7 +192,7 @@ class OverviewTests(Fixture):
     def test_the_menu_has_the_entries_in_the_order_of_the_specification_and_the_link_to_the_mail_texts(self):
         keys = [entry["key"] for entry in navigation.menu_entries(self.staff)]
         self.assertEqual(
-            keys, ["overview", "processes", "persons", "locations", "legs", "metering_points", "settings", "contracts"]
+            keys, ["overview", "processes", "persons", "locations", "legs", "circuits", "metering_points", "settings", "contracts"]
         )
         # The link to the Django administration keeps its permission model (D-086); "Contracts" follows it (owner design).
         editor = staff_user("staff.mail@example.org")

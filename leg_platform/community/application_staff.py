@@ -235,9 +235,7 @@ def _existing_for(building):
     if existing is None:
         return None
     existing = Location.objects.select_for_update().get(pk=existing.pk)
-    if existing.is_archived or (
-        building.egid is not None and existing.egid is not None and existing.egid != building.egid
-    ):
+    if not buildings.usable(existing, building.egid):
         raise ApplicationError("building_unavailable")
     # A building is shared by every customer of it: the one that exists is used, whoever else is there.
     if existing.egid is None and building.egid is not None:

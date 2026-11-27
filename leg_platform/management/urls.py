@@ -4,6 +4,7 @@ URL names start with the menu key (``navigation.MENU``)."""
 from django.urls import path
 
 from leg_platform.management import (
+    circuit_views,
     contract_views,
     deadline_views,
     leg_views,
@@ -123,10 +124,13 @@ urlpatterns = [
         "locations/<int:pk>/suggestion/", location_views.LocationSuggestionView.as_view(),
         name="locations_suggestion",
     ),
-    path(
-        "transformer-circuits/<int:pk>/edit/", location_views.CircuitEditView.as_view(),
-        name="circuits_edit",
-    ),
+    # Transformer circuits (D-142)
+    path("transformer-circuits/", circuit_views.CircuitListView.as_view(), name="circuits"),
+    path("transformer-circuits/print/", print_views.CircuitPrintView.as_view(), name="circuits_print"),
+    path("transformer-circuits/new/", circuit_views.CircuitCreateView.as_view(), name="circuits_new"),
+    path("transformer-circuits/search/", circuit_views.CircuitSearchView.as_view(), name="circuits_search"),
+    path("transformer-circuits/<int:pk>/", circuit_views.CircuitDetailView.as_view(), name="circuits_detail"),
+    path("transformer-circuits/<int:pk>/edit/", circuit_views.CircuitEditView.as_view(), name="circuits_edit"),
     # Metering points
     path("metering-points/", mp_views.MeteringPointListView.as_view(), name="metering_points"),
     path("metering-points/print/", print_views.MeteringPointPrintView.as_view(), name="metering_points_print"),

@@ -114,6 +114,36 @@ class ChapterTests(DeadlinesBase):
 
 
 @tag("mariadb")
+class FoldedBlockTests(DeadlinesBase):
+    """Each deadline is a closed ``<details>`` block whose row shows the name and the days (owner walk-through
+    2026-11-27); a block with an error is open; one button below all blocks."""
+
+    def chapter(self, response):
+        page = response.content.decode()
+        return page[page.index('id="deadlines-title"'):page.index("</form>", page.index('id="deadlines-title"'))]
+
+    def test_every_block_is_closed_and_its_row_shows_the_name_and_the_days(self):
+        ManagementSettings.objects.update(reminder_after_days=1)
+        chapter = self.chapter(self.client.get(SETTINGS))
+        self.assertEqual(chapter.count('<details class="mgmt-deadline">'), len(FIELDS))
+        self.assertNotIn("open>", chapter)
+        summary = chapter[chapter.index("<summary"):chapter.index("</summary>")]
+        self.assertIn("Anmeldung nicht abgeschlossen", summary)
+        self.assertIn(">1 Tag</span>", summary)
+        self.assertIn(f">{deadline_settings.current_values()['rollback_after_days']} Tage</span>", chapter)
+        self.assertEqual(chapter.count('type="submit"'), 1)
+        self.assertLess(chapter.rindex("</details>"), chapter.index('type="submit"'))
+
+    def test_a_block_with_an_error_is_open_and_the_others_stay_closed(self):
+        chapter = self.chapter(self.client.post(URL, {**VALID, "rollback_after_days": "x"}))
+        self.assertEqual(chapter.count('<details class="mgmt-deadline" open>'), 1)
+        opened = chapter[chapter.index('<details class="mgmt-deadline" open>'):]
+        self.assertIn('name="rollback_after_days" value="x"', opened[:opened.index("</details>")])
+        # The rows of the posted values show what was typed (the form is bound).
+        self.assertIn(">3 Tage</span>", chapter)
+
+
+@tag("mariadb")
 class RunTimeTests(DeadlinesBase):
     def test_the_time_is_saved_with_a_history_without_a_value(self):
         response = self.client.post(RUN_TIME_URL, {"run_time": "04:30"})

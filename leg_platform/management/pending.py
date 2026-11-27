@@ -6,7 +6,8 @@ the dialogs of the correction (D-109) one click away. Only submitted application
 appear; a draft is the customer's. The search words of the list apply to the address, the numbers and the applicant. The
 views put the rows among the stored ones (``location_views.pending_entries``, ``metering_point_views.pending_entries``)
 only on the first page of a list without filters; at most ``MAX_ROWS`` rows, the rest is counted and the line below the
-list leads to the processes. A metering point added at a stored location is a row under that location."""
+list leads to the processes. A metering point added at a stored location, or of a new building whose EGID or address
+names a stored location (``location_list.folded_buildings``, D-140), is a row under that location on every page."""
 
 from urllib.parse import urlencode
 

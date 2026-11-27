@@ -10,7 +10,7 @@ from django.test import TestCase, tag
 from django.urls import reverse
 
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
-from leg_platform.community import history, locations, preferences
+from leg_platform.community import history, locations, preferences, transformer_circuits
 from leg_platform.community.addressing import AddressSuggestion
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import (
@@ -204,7 +204,7 @@ class LocationPageTests(TestCase):
 
     def test_the_detail_page_offers_the_buttons_and_names_the_persons(self):
         page = self.client.get(self.detail()).content.decode()
-        for text in ("Bearbeiten", "Messpunkt anlegen", "Standort archivieren", "Trafokreis bearbeiten", "Ada Mueller"):
+        for text in ("Bearbeiten", "Messpunkt anlegen", "Standort archivieren", "Trafokreis wählen", "Ada Mueller"):
             self.assertIn(text, page)
         self.assertNotIn("Standort löschen", page)  # it has metering points
         # Only without a history: the button "delete" instead of "archive".
@@ -249,7 +249,7 @@ class LocationPageTests(TestCase):
         url = reverse("management:locations_new")
         data = {
             "street": "Bachweg", "house_number": "7", "address_addition": "Hinterhaus", "postal_code": "3000",
-            "town": "Bern", "transformer_circuit": str(self.circuit.pk), "remark": "intern",
+            "town": "Bern", "transformer_circuit": "TRA21359 · Ittigen Nord · von Hand", "remark": "intern",
         }
         response = client.post(url, {**data, "next": reverse("management:locations")})
         created = Location.objects.get(street="Bachweg")
@@ -274,38 +274,26 @@ class LocationPageTests(TestCase):
             self.assertEqual(client.post(url, {**data, "street": "Anderer Weg", **bad}).status_code, 200)
             self.assertFalse(Location.objects.filter(street="Anderer Weg").exists())
 
-    def test_a_new_circuit_is_created_with_the_location_in_one_step(self):
+    def test_a_station_of_the_directory_is_created_with_the_location_and_an_unknown_number_is_refused(self):
         url = reverse("management:locations_new")
-        data = {
-            "street": "Bachweg", "house_number": "7", "postal_code": "3000", "town": "Bern",
-            "transformer_circuit": "__new__", "new_circuit_number": "tra777", "new_circuit_name": "Neu",
-        }
-        self.assertEqual(self.client.post(url, data).status_code, 302)
-        created = Location.objects.get(street="Bachweg")
-        self.assertEqual((created.transformer_circuit.grid_number, created.transformer_circuit.name), ("TRA777", "Neu"))
-        # Everything typed is kept when something is wrong, and nothing is created, not even the circuit.
+        data = {"street": "Bachweg", "house_number": "7", "postal_code": "3000", "town": "Bern"}
         circuits = TransformerCircuit.objects.count()
-        for bad, message in (
-            ({"street": "Anderer Weg", "postal_code": "30"}, None),
-            ({"street": "Anderer Weg", "new_circuit_number": "555"}, "Geben Sie die Netzbetreiber-Nummer ein: TRA und Ziffern."),
-            ({"street": "Anderer Weg", "new_circuit_number": "TRA21359"}, "Dieser Trafokreis existiert bereits."),
-            ({"new_circuit_number": "TRA888"}, "Diese Adresse gibt es schon"),  # the address exists: no circuit
-        ):
-            with self.subTest(bad=bad):
-                response = self.client.post(url, {**data, **bad})
-                self.assertEqual(response.status_code, 200)
-                self.assertContains(response, 'value="Anderer Weg"' if "street" in bad else 'value="Bachweg"')
-                if message:
-                    self.assertContains(response, message)
-        self.assertEqual(TransformerCircuit.objects.count(), circuits)
-        self.assertFalse(Location.objects.filter(street="Anderer Weg").exists())
-        # A chosen circuit together with a typed number is refused, a number without a choice creates a circuit.
-        both = {**data, "street": "Zweiter Weg", "transformer_circuit": str(self.circuit.pk)}
-        self.assertContains(self.client.post(url, both), "nicht beides")
-        self.assertFalse(Location.objects.filter(street="Zweiter Weg").exists())
-        only_number = {**data, "street": "Dritter Weg", "transformer_circuit": "", "new_circuit_number": "TRA999"}
-        self.assertEqual(self.client.post(url, only_number).status_code, 302)
-        self.assertEqual(Location.objects.get(street="Dritter Weg").transformer_circuit.grid_number, "TRA999")
+        with mock.patch.object(transformer_circuits, "directory_numbers", return_value={"TRA777"}):
+            for bad in ("TRA888", "Unbekannter Name", "TRA777x"):
+                with self.subTest(bad=bad):
+                    response = self.client.post(url, {**data, "transformer_circuit": bad})
+                    self.assertContains(response, "Diesen Trafokreis gibt es nicht.")
+            self.assertEqual(TransformerCircuit.objects.count(), circuits)
+            self.assertFalse(Location.objects.filter(street="Bachweg").exists())
+            self.assertEqual(self.client.post(url, {**data, "transformer_circuit": "tra777 · Netzbetreiber"}).status_code, 302)
+        created = Location.objects.get(street="Bachweg")
+        self.assertEqual(created.transformer_circuit.grid_number, "TRA777")
+        self.assertTrue(created.circuit_manual)
+        self.assertEqual(history.entries_for(created.transformer_circuit).get().actor, self.staff)
+        # The automatic choice (empty or its text) is no hand choice.
+        automatic = {**data, "street": "Dritter Weg", "transformer_circuit": "Automatisch (gemäss Netzbetreiber)"}
+        self.assertEqual(self.client.post(url, automatic).status_code, 302)
+        self.assertFalse(Location.objects.get(street="Dritter Weg").circuit_manual)
 
     def test_a_location_created_for_the_metering_point_form_returns_to_it_with_the_location_chosen(self):
         form = reverse("management:metering_points_new")
@@ -366,49 +354,66 @@ class LocationPageTests(TestCase):
         url = reverse("management:locations_circuit", args=[self.fresh.pk])
         client = self.client
         page = client.get(url)
-        self.assertContains(page, "Kein Trafokreis")
-        self.assertContains(page, "+ Neuen Trafokreis anlegen")
-        client.post(url, {"transformer_circuit": str(self.circuit.pk)})
+        self.assertContains(page, "Trafokreis wählen")
+        self.assertContains(page, 'value="Automatisch (gemäss Netzbetreiber)"')
+        self.assertNotContains(page, "Neuen Trafokreis anlegen")
+        client.post(url, {"transformer_circuit": "TRA21359 · Ittigen Nord · von Hand"})
+        self.fresh.refresh_from_db()
+        self.assertEqual((self.fresh.transformer_circuit, self.fresh.circuit_manual), (self.circuit, True))
+        self.assertContains(client.get(url), 'value="TRA21359 · Ittigen Nord"')
+        refused = client.post(url, {"transformer_circuit": "TRA999999"})
+        self.assertContains(refused, "Diesen Trafokreis gibt es nicht.")
         self.fresh.refresh_from_db()
         self.assertEqual(self.fresh.transformer_circuit, self.circuit)
-        client.post(url, {"transformer_circuit": "999999"})
+        # Back to the automatic choice (the directory cannot answer in this test: no circuit).
+        client.post(url, {"transformer_circuit": "Automatisch (gemäss Netzbetreiber)"})
+        self.fresh.refresh_from_db()
+        self.assertEqual((self.fresh.transformer_circuit, self.fresh.circuit_manual), (None, False))
+        # The name of exactly one circuit is enough without the script.
+        client.post(url, {"transformer_circuit": "ittigen nord"})
         self.fresh.refresh_from_db()
         self.assertEqual(self.fresh.transformer_circuit, self.circuit)
-        client.post(url, {"transformer_circuit": ""})
-        self.fresh.refresh_from_db()
-        self.assertIsNone(self.fresh.transformer_circuit)
 
-    def test_a_new_circuit_is_created_and_assigned_by_the_circuit_dialog(self):
-        client = self.client
+    def test_saving_the_unchanged_automatic_choice_keeps_the_derived_circuit(self):
+        # Security re-check M-1: the directory cannot answer here; the derived circuit must not be removed.
+        location = make_location("Stromweg", "7", "3063", "Ittigen", egid=190001, transformer_circuit=self.circuit)
+        url = reverse("management:locations_circuit", args=[location.pk])
+        shown = "Automatisch (gemäss Netzbetreiber): TRA21359"
+        self.assertContains(self.client.get(url), f'value="{shown}"')
+
+        self.client.post(url, {"transformer_circuit": shown})
+
+        location.refresh_from_db()
+        self.assertEqual((location.transformer_circuit, location.circuit_manual), (self.circuit, False))
+        self.assertFalse(history.entries_for(location).filter(event=HistoryEvent.TRANSFORMER_CIRCUIT_CHANGED).exists())
+
+    def test_choosing_a_station_that_is_not_stored_creates_its_circuit(self):
         url = reverse("management:locations_circuit", args=[self.fresh.pk])
-        # A number that exists: the message at the number, nothing is created or assigned.
-        taken = client.post(url, {"transformer_circuit": "__new__", "new_circuit_number": "tra21359", "new_circuit_name": "Anders"})
-        self.assertContains(taken, "Dieser Trafokreis existiert bereits. Wählen Sie ihn in der Liste.")
-        self.assertEqual(TransformerCircuit.objects.count(), 1)
-        self.fresh.refresh_from_db()
-        self.assertIsNone(self.fresh.transformer_circuit)
-        self.circuit.refresh_from_db()
-        self.assertEqual(self.circuit.name, "Ittigen Nord")  # the existing one is not changed
-        # A new number is created and assigned, in one step.
-        client.post(url, {"transformer_circuit": "__new__", "new_circuit_number": "tra555", "new_circuit_name": "Neu"})
+        with mock.patch.object(transformer_circuits, "directory_numbers", return_value={"TRA555"}):
+            self.client.post(url, {"transformer_circuit": "TRA555 · Netzbetreiber"})
         self.fresh.refresh_from_db()
         self.assertEqual(self.fresh.transformer_circuit.grid_number, "TRA555")
-        self.assertEqual(self.fresh.transformer_circuit.name, "Neu")
-        # A wrong number: the dialog again, nothing changes.
-        bad = client.post(url, {"transformer_circuit": "__new__", "new_circuit_number": "555"})
-        self.assertEqual(bad.status_code, 200)
-        self.assertEqual(TransformerCircuit.objects.count(), 2)
-        self.assertEqual(history.entries_for(self.fresh).filter(event=HistoryEvent.TRANSFORMER_CIRCUIT_CHANGED).count(), 1)
-    def test_changing_a_circuit_says_how_many_locations_it_reaches(self):
-        url = reverse("management:circuits_edit", args=[self.circuit.pk])
-        client = self.client
-        self.assertContains(client.get(url), "Die Änderung betrifft 1 Standort.")
-        client.post(url, {"grid_number": "tra21359", "name": "Ittigen Süd"})
-        self.circuit.refresh_from_db()
-        self.assertEqual(self.circuit.name, "Ittigen Süd")
-        other = make_circuit("TRA5")
-        taken = client.post(reverse("management:circuits_edit", args=[other.pk]), {"grid_number": "TRA21359", "name": ""})
-        self.assertContains(taken, "Diesen Trafokreis gibt es schon.")
+        self.assertEqual(
+            history.entries_for(self.fresh).filter(event=HistoryEvent.TRANSFORMER_CIRCUIT_CHANGED).count(), 1
+        )
+        # While the directory cannot answer, a number that is not stored is refused.
+        with mock.patch.object(transformer_circuits, "directory_numbers", return_value=None):
+            refused = self.client.post(url, {"transformer_circuit": "TRA556"})
+        self.assertContains(refused, "Diesen Trafokreis gibt es nicht.")
+        self.assertFalse(TransformerCircuit.objects.filter(grid_number="TRA556").exists())
+
+    def test_the_grid_card_links_the_circuit_and_names_the_choice(self):
+        page = self.client.get(self.detail()).content.decode()
+        self.assertIn(reverse("management:circuits_detail", args=[self.circuit.pk]), page)
+        self.assertIn("Automatisch (gemäss Netzbetreiber)", page)
+        self.assertNotIn("Trafokreis bearbeiten", page)
+
+    def test_a_derived_change_is_shown_as_automatic_in_the_history(self):
+        history.record(self.fresh, HistoryEvent.TRANSFORMER_CIRCUIT_CHANGED, None, {"old": "", "new": "TRA1", "derived": True})
+        history.record(self.fresh, HistoryEvent.TRANSFORMER_CIRCUIT_CHANGED, None, {"old": "TRA1", "new": ""})
+        page = self.client.get(self.detail(self.fresh)).content.decode()
+        self.assertIn("<td>automatisch (Netzbetreiber)</td>", page)
+        self.assertIn("<td>–</td>", page)
 
     def test_a_number_taken_in_parallel_shows_the_dialog_with_the_error(self):
         from django.core.exceptions import ValidationError

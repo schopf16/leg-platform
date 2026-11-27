@@ -5,9 +5,12 @@ flows without JavaScript. Every staff account sees and may do everything (D-086)
 service level (``community/tests/test_leg_rules.py``); here only what the views add. The negative authorization of
 every URL for anonymous, non-staff and second-factor-less accounts is in ``test_access.py`` (the route walk)."""
 
+import re
 from datetime import timedelta
 from decimal import Decimal
+from pathlib import Path
 
+from django.conf import settings
 from django.test import TestCase, tag
 from django.urls import reverse
 from django.utils import timezone
@@ -174,6 +177,18 @@ class LegPageTests(TestCase):
         point = self.bahnhof.assignments.first().metering_point
         self.assertContains(page, f'href="{reverse("management:metering_points_leg", args=[point.pk])}?next=')
         self.assertContains(page, "LEG für diesen Messpunkt wechseln")
+
+    def test_below_1440_px_the_metering_points_are_cards_and_never_a_table_that_scrolls_sideways(self):
+        # Tester finding (real browser): at 1024 and 1280 px the seven columns overflowed the card and cut the circuit.
+        page = self.client.get(self.detail(self.bahnhof)).content.decode()
+        self.assertIn('class="mgmt-table-view mgmt-members-view"', page)
+        self.assertIn('class="mgmt-cards-view mgmt-members-cards"', page)
+        css = (Path(settings.BASE_DIR) / "leg_platform/management/static/management/css/management.css").read_text(
+            encoding="utf-8"
+        )
+        rule = re.search(r"@media \(min-width: 761px\) and \(max-width: 1439px\) \{(.*?)\n\}", css, re.S).group(1)
+        self.assertRegex(rule, r"\.mgmt-members-view \{\s*display: none;")
+        self.assertRegex(rule, r"\.mgmt-members-cards \{\s*display: block;")
 
     def test_a_leg_of_several_circuits_recommends_the_leg_of_its_own_and_has_no_banner_without_a_problem(self):
         client = self.client

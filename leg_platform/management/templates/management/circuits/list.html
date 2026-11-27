@@ -1,0 +1,65 @@
+{% extends "management/page.html" %}
+{% load i18n static management_ui %}{% comment %}
+The list of transformer circuits (D-142), built like the list of LEGs (D-097): a table on a desktop, one card per
+circuit on a phone. The number is the link to the detail page; the metering points per direction say how many of them
+belong to a LEG ("3 of 4"); the LEGs of the circuit are links. "Print" (a desktop only) stands left of "Create
+transformer circuit". The page works without a script: the search is a GET form.
+{% endcomment %}
+{% block inner_class %}mgmt-page mgmt-wide mgmt-circuits{% endblock %}
+{% block header_actions %}
+  {% include "management/_print_button.html" %}
+  <a class="btn btn-primary" href="{{ create_url }}">{% translate "Create transformer circuit" %}</a>
+{% endblock %}
+{% block page_content %}
+  {% translate "Number, name or LEG" as search_placeholder %}
+  {% include "management/_list_form_start.html" %}
+    <noscript><button type="submit" class="btn btn-secondary-action">{% translate "Apply" %}</button></noscript>
+  </form>
+
+  <div class="mgmt-list" data-list data-list-key="{{ list_key }}" data-widths-url="{{ list_widths_url }}" data-csrf="{{ csrf_token }}" data-min-width="90">
+    <div class="mgmt-table-view mgmt-list-card">
+      <table class="mgmt-table mgmt-table-fixed">
+        {% include "management/_list_head.html" %}
+        <tbody>
+          {% for entry in entries %}
+            <tr>
+              <td><a class="mgmt-row-link tnum" href="{{ entry.detail_url }}">{{ entry.circuit.grid_number }}</a></td>
+              <td>{% if entry.circuit.name %}<div class="mgmt-cut" title="{{ entry.circuit.name }}">{{ entry.circuit.name }}</div>{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
+              <td>{{ entry.source_text }}</td>
+              <td class="tnum">{{ entry.row.locations }}</td>
+              <td class="tnum">{% if entry.consumption_text %}{{ entry.consumption_text }}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
+              <td class="tnum">{% if entry.feed_in_text %}{{ entry.feed_in_text }}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
+              <td>{% for leg in entry.legs %}<a href="{{ leg.url }}">{{ leg.name }}</a>{% if not forloop.last %}, {% endif %}{% empty %}<span class="mgmt-muted">–</span>{% endfor %}</td>
+              <td class="mgmt-link-col">{% translate "Go to the transformer circuit" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label subject=entry.circuit.grid_number %}</td>
+            </tr>
+          {% empty %}
+            {% include "management/_empty_row.html" with colspan=8 text=empty_text %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mgmt-cards-view">
+      {% for entry in entries %}
+        <article class="mgmt-place">
+          <div class="mgmt-place-addr"><a class="mgmt-row-link tnum" href="{{ entry.detail_url }}">{{ entry.circuit.grid_number }}</a>{% if entry.circuit.name %} · {{ entry.circuit.name }}{% endif %}{% translate "Go to the transformer circuit" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label subject=entry.circuit.grid_number %}</div>
+          <dl class="mgmt-facts">
+            <div class="mgmt-fact"><dt>{% translate "Source" %}</dt><dd>{{ entry.source_text }}</dd></div>
+            <div class="mgmt-fact"><dt>{% translate "Locations" %}</dt><dd class="tnum">{{ entry.row.locations }}</dd></div>
+            <div class="mgmt-fact"><dt>{% translate "Consumption" %}</dt><dd class="tnum">{% if entry.consumption_text %}{{ entry.consumption_text }}{% else %}–{% endif %}</dd></div>
+            <div class="mgmt-fact"><dt>{% translate "Feed-in" %}</dt><dd class="tnum">{% if entry.feed_in_text %}{{ entry.feed_in_text }}{% else %}–{% endif %}</dd></div>
+            <div class="mgmt-fact"><dt>{% translate "LEGs" %}</dt><dd>{% for leg in entry.legs %}<a href="{{ leg.url }}">{{ leg.name }}</a>{% if not forloop.last %}, {% endif %}{% empty %}–{% endfor %}</dd></div>
+          </dl>
+        </article>
+      {% empty %}
+        <p class="mgmt-empty-text">{{ empty_text }}</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% include "management/_list_foot.html" %}
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'management/js/list.js' %}"></script>
+{% endblock %}

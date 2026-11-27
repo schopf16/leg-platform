@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% load i18n static management_ui %}{% comment %}
+The detail page of a transformer circuit (D-142), built like the pages of a location and a LEG: the card "Transformer
+circuit" (number, name, source; "Rename") and the card "Figures" side by side on a desktop, then the locations of the
+circuit (links), the LEGs with metering points in it (links) and the history. A circuit is neither deleted nor merged:
+the page has no button at the top right.
+{% endcomment %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'management/css/management.css' %}">{% endblock %}
+{% block inner_class %}mgmt-page mgmt-wide{% endblock %}
+{% block content %}
+  {% include "management/_icons.html" %}
+  <a class="mgmt-back" href="{{ back_url }}">← {% translate "Back to transformer circuits" %}</a>
+
+  <div class="mgmt-header mgmt-detail-header">
+    <div>
+      <h1 class="start-title tnum">{{ page_title }}</h1>
+      <p class="mgmt-subtitle">{{ subtitle }}</p>
+    </div>
+  </div>
+
+  {% if show_new %}
+    {% translate "Transformer circuit created. Next: choose it at the locations." as new_text %}
+    {% include "management/_banner.html" with text=new_text neutral=True %}
+  {% endif %}
+
+  <div class="mgmt-two-cols">
+    <div class="mgmt-col">
+      <section class="mgmt-card">
+        <div class="mgmt-card-head"><h2>{% translate "Transformer circuit" %}</h2><a class="btn btn-secondary-action btn-xs" href="{% url 'management:circuits_edit' circuit.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Rename" %}</a></div>
+        <dl class="mgmt-facts">
+          <div class="mgmt-fact"><dt>{% translate "Number" %}</dt><dd class="tnum">{{ circuit.grid_number }}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Name" %}</dt><dd>{% if circuit.name %}{{ circuit.name }}{% else %}–{% endif %}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Source" %}</dt><dd>{{ source_text }}</dd></div>
+        </dl>
+      </section>
+    </div>
+    <div class="mgmt-col">
+      <section class="mgmt-card">
+        <div class="mgmt-card-head"><h2>{% translate "Figures" %}</h2></div>
+        <dl class="mgmt-facts">
+          <div class="mgmt-fact"><dt>{% translate "Locations" %}</dt><dd class="tnum mgmt-num">{{ row.locations }}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Metering points" %}</dt>
+            <dd><span class="mgmt-count-grid tnum"><span>{{ row.consumption }}</span>{% include "management/_direction.html" with direction="consumption" %}<span>{{ row.feed_in }}</span>{% include "management/_direction.html" with direction="feed_in" %}</span></dd>
+          </div>
+          <div class="mgmt-fact"><dt>{% translate "In a LEG" %}</dt><dd class="tnum mgmt-num">{{ row.points_in_leg }}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Not in a LEG" %}</dt><dd class="tnum mgmt-num">{{ not_in_leg }}</dd></div>
+        </dl>
+      </section>
+    </div>
+  </div>
+
+  <section class="mgmt-card mgmt-card-flush">
+    <div class="mgmt-card-head mgmt-card-pad"><h2>{% translate "Locations" %}</h2></div>
+    <table class="mgmt-table">
+      <thead><tr><th>{% translate "Address" %}</th><th>{% translate "Postal code, town" %}</th><th>{% translate "Metering points" %}</th></tr></thead>
+      <tbody>
+        {% for item in locations %}
+          <tr><td><a href="{{ item.url }}">{{ item.location.street }} {{ item.location.house_number }}</a></td><td>{{ item.location.postal_code }} {{ item.location.town }}</td><td>{{ item.count_phrase }}</td></tr>
+        {% empty %}
+          {% translate "No locations in this transformer circuit." as empty_locations %}
+          {% include "management/_empty_row.html" with colspan=3 text=empty_locations %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="mgmt-card mgmt-card-flush">
+    <div class="mgmt-card-head mgmt-card-pad"><h2>{% translate "LEGs" %}</h2></div>
+    <table class="mgmt-table">
+      <thead><tr><th>{% translate "LEG" %}</th><th>{% translate "In this transformer circuit" %}</th><th>{% translate "In total" %}</th><th>{% translate "Discount tier" %}</th></tr></thead>
+      <tbody>
+        {% for item in legs %}
+          <tr><td><a href="{{ item.url }}">{{ item.leg.name }}</a>{% if item.leg.is_archived %} <span class="mgmt-new">{% translate "archived" %}</span>{% endif %}</td><td class="tnum">{{ item.here }}</td><td class="tnum">{{ item.total }}</td><td>{% if item.tier %}{{ item.tier }}{% else %}–{% endif %}</td></tr>
+        {% empty %}
+          {% translate "No LEG has metering points in this transformer circuit." as empty_legs %}
+          {% include "management/_empty_row.html" with colspan=4 text=empty_legs %}
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="mgmt-note mgmt-card-pad">{% translate "Metering points of the LEG in this transformer circuit and in total." %}</p>
+  </section>
+
+  <section class="mgmt-card mgmt-card-flush">
+    <div class="mgmt-card-head mgmt-card-pad"><h2>{% translate "History" %}</h2></div>
+    <table class="mgmt-table mgmt-history">
+      <thead><tr><th>{% translate "Date" %}</th><th>{% translate "Event" %}</th><th>{% translate "By" %}</th></tr></thead>
+      <tbody>
+        {% for entry in history %}
+          <tr><td>{{ entry.time|date:"d.m.Y H:i" }}</td><td>{{ entry.label }}</td><td>{{ entry.actor|default:"–" }}</td></tr>
+        {% empty %}
+          {% translate "No entries yet." as empty_history %}
+          {% include "management/_empty_row.html" with colspan=3 text=empty_history %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+{% endblock %}

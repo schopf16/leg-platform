@@ -161,11 +161,13 @@ def pending_entries(request, state):
     )
     total = found.count()
     found = found.select_related("building__application__person", "building__location").order_by("number", "pk")
+    folded = location_list.folded_buildings()  # a new building at a stored address links to that location (D-140)
     entries = []
     for point in found[:pending.MAX_ROWS]:
         building = point.building
         application = building.application
         address = building.current_address()
+        location_id = building.location_id or folded.get(building.pk)
         entries.append(
             {
                 "pending": True,
@@ -173,8 +175,7 @@ def pending_entries(request, state):
                     number=point.number, direction=point.direction, location=None, current_leg_id=None,
                 ),
                 "address": f"{address[0]} {address[1]}".strip(),
-                "location_url": reverse("management:locations_detail", args=[building.location_id])
-                if building.location_id else "",
+                "location_url": reverse("management:locations_detail", args=[location_id]) if location_id else "",
                 "applicant": pending._applicant(application.person),
                 "applicant_url": reverse("management:persons_detail", args=[application.person_id]),
                 "state": labels.application_state_label(application.state),
@@ -324,6 +325,7 @@ class MeteringPointDetailView(ManagementAccessMixin, View):
             "location": location,
             "location_url": reverse("management:locations_detail", args=[location.pk]) if location else "",
             "circuit": circuit.grid_number if circuit else "",
+            "circuit_url": reverse("management:circuits_detail", args=[circuit.pk]) if circuit else "",
             "leg_rows": leg_rows,
             "person_rows": person_rows,
             "has_leg": bool(leg_chain),

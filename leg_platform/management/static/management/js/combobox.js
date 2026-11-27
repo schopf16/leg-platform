@@ -10,7 +10,10 @@
    Pointer and touch: a tap on a row takes it (the click, so that scrolling the list with a finger takes nothing);
    the list stays open while a row is pressed. The list is never turned above the field.
 
-   Speed: at least two characters (the server answers nothing below that), 120 ms after the last key, and an
+   A field with data-suggest-minimum="0" (the transformer circuit of a location, D-142) is always prefilled: a focus or
+   a click that opens the list selects the whole text and lists from the start; typing replaces the text and filters.
+
+   Speed: at least two characters (or data-suggest-minimum), 120 ms after the last key, and an
    answer for an older text is dropped: the request for it is cancelled (AbortController), so fast typing does not
    pile up requests. The answers are shown as text (textContent); nothing is built from markup. */
 (() => {
@@ -34,6 +37,8 @@
 
   document.querySelectorAll("input[data-suggest-url]").forEach((input, index) => {
     const url = input.dataset.suggestUrl;
+    const given = Number(input.dataset.suggestMinimum);
+    const minimum = input.dataset.suggestMinimum !== undefined && given >= 0 ? given : MINIMUM;
     const box = make("div", "mgmt-combobox");
     input.parentNode.insertBefore(box, input);
     box.appendChild(input);
@@ -62,6 +67,8 @@
     let chosen = "";
     let pointerType = "mouse";
     let pausedUntil = 0;
+    let listingAll = false;
+    let selectOnRelease = false;
 
     const close = () => {
       list.hidden = true;
@@ -145,17 +152,20 @@
         options.push({ element, value });
       });
       const count = options.length;
-      status.textContent = (count === 1 ? input.dataset.messageOne : input.dataset.messageMany || "").replace(
+      status.textContent = ((count === 1 ? input.dataset.messageOne : input.dataset.messageMany) || "").replace(
         "%(count)s",
         String(count)
       );
       open();
     };
 
-    const search = (text) => {
+    // ``all``: the list from the start whatever the field shows (minimum 0); its answer counts only while no other search
+    // began and the field still shows what it showed (typing within the delay drops it).
+    const search = (text, all = false) => {
       if (controller) {
         controller.abort();
       }
+      listingAll = all;
       if (Date.now() < pausedUntil) {
         // The server said "too many requests": no request until the time it named has passed (M-3, M-4). The text is
         // forgotten, so the same text is searched again once the pause is over (L-D).
@@ -163,8 +173,11 @@
         note(input.dataset.messageLimited || "");
         return;
       }
-      controller = new AbortController();
-      fetch(url + "?" + new URLSearchParams({ q: text }).toString(), {
+      const own = new AbortController();
+      controller = own;
+      const shown = input.value;
+      const current = () => controller === own && (all ? input.value === shown : input.value.trim() === text);
+      fetch(url + (url.includes("?") ? "&" : "?") + new URLSearchParams({ q: text }).toString(), {
         credentials: "same-origin",
         headers: { Accept: "application/json" },
         signal: controller.signal,
@@ -174,7 +187,7 @@
             const seconds = Number(response.headers.get("Retry-After"));
             pausedUntil = Date.now() + (seconds > 0 && seconds <= 120 ? seconds : 30) * 1000;
             last = ""; // L-D: the same text is searched again after the pause
-            if (input.value.trim() === text) {
+            if (current()) {
               note(input.dataset.messageLimited || "");
             }
             return null;
@@ -182,18 +195,23 @@
           return response.ok ? response.json() : null;
         })
         .then((data) => {
-          if (data && input.value.trim() === text) {
+          if (data && current()) {
             render(Array.isArray(data.results) ? data.results.filter((value) => typeof value === "string") : []);
           }
         })
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => {
+          if (controller === own) {
+            listingAll = false;
+          }
+        });
     };
 
     input.addEventListener("input", () => {
       window.clearTimeout(timer);
       chosen = "";
       const text = input.value.trim();
-      if (text.length < MINIMUM) {
+      if (text.length < minimum) {
         if (controller) {
           controller.abort();
         }
@@ -201,7 +219,7 @@
         last = "";
         return;
       }
-      if (text === last) {
+      if (text === last && (text || !list.hidden)) {
         return;
       }
       timer = window.setTimeout(() => {
@@ -263,8 +281,37 @@
         }
       }, 150);
     });
+    // Minimum 0: the whole list on a focus or a click while it is closed; the text is selected, so typing replaces it.
+    const listAll = () => {
+      if (!list.hidden) {
+        return;
+      }
+      if (!listingAll) {
+        window.clearTimeout(timer);
+        last = "";
+        search("", true);
+      }
+      // After the search: ``select`` also focuses a field that has no focus yet, and that focus must not ask again.
+      input.select();
+    };
+    if (minimum === 0) {
+      // A press that focuses the field or opens the closed list again selects the whole text: the mouse button going up
+      // would put the caret into the text (also into a text that is still selected) and undo the selection.
+      input.addEventListener("pointerdown", () => {
+        selectOnRelease = document.activeElement !== input || list.hidden;
+      });
+      input.addEventListener("mouseup", (event) => {
+        if (selectOnRelease) {
+          event.preventDefault();
+          selectOnRelease = false;
+        }
+      });
+      input.addEventListener("click", listAll);
+    }
     input.addEventListener("focus", () => {
-      if (options.length && input.value.trim() === last && last.length >= MINIMUM && chosen !== last) {
+      if (minimum === 0) {
+        listAll();
+      } else if (options.length && input.value.trim() === last && last.length >= minimum && chosen !== last) {
         open();
       }
     });

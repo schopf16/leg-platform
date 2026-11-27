@@ -6,6 +6,8 @@
   are translated when the field is drawn (a field object lives as long as the process, a language does not).
 * ``SegmentedChoiceField``, ``remark_field``, ``date_field``, ``select_field``: one definition each, so that the same
   kind of field looks the same in every form.
+* ``PasswordManagerIgnoreMixin``: the base of every form of the management area; tells the password managers to leave
+  its fields alone (D-141).
 * ``make_fact``: turns a field into a read-only fact row (a value the context gives: D-094, rule on locked fields).
   The field stays in the form and its place in ``layout``, but it is ``disabled``: Django then ignores whatever the
   browser posts and takes the initial value, so a forged POST cannot change it.
@@ -18,6 +20,7 @@ from decimal import Decimal, InvalidOperation
 
 from django import forms
 from django.core.exceptions import ValidationError
+from django.forms.widgets import Input
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -25,6 +28,33 @@ from leg_platform.community import numbers
 from leg_platform.community.models import REMARK_MAX_LENGTH
 
 CONTROL = {"class": "form-control", "autocomplete": "off"}
+
+# The vendor attributes that keep a password manager from filling or decorating a field (D-141). ``autocomplete="off"``
+# is not enough: the managers ignore it. Never on a login, password, code or passkey field.
+PASSWORD_MANAGER_IGNORE = {"data-lpignore": "true", "data-1p-ignore": True, "data-bwignore": True}
+_NOT_TYPED = frozenset({"checkbox", "radio", "hidden", "file", "submit", "password"})
+
+
+def ignored_by_password_managers(widget):
+    """Whether ``PASSWORD_MANAGER_IGNORE`` belongs on the widget: a field one types into or chooses from."""
+    if isinstance(widget, Input):
+        return widget.input_type not in _NOT_TYPED
+    return isinstance(widget, (forms.Textarea, forms.Select))
+
+
+class PasswordManagerIgnoreMixin:
+    """No field of the management area is a credential: each typed field carries ``PASSWORD_MANAGER_IGNORE``. Set
+    when the field is drawn, so a widget that a form replaces in its ``__init__`` gets it too."""
+
+    def __getitem__(self, name):
+        field = self.fields.get(name)
+        if field is not None and ignored_by_password_managers(field.widget):
+            field.widget.attrs.update(PASSWORD_MANAGER_IGNORE)
+        return super().__getitem__(name)
+
+
+class ManagementForm(PasswordManagerIgnoreMixin, forms.Form):
+    """The base of the forms of the management area."""
 
 REMARK_ROWS = 4
 

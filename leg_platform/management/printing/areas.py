@@ -13,6 +13,7 @@ from django.utils.translation import pgettext
 
 from leg_platform.community import (
     assignments,
+    circuit_list,
     grid_operator,
     leg_list,
     legs,
@@ -27,7 +28,7 @@ from leg_platform.community import (
 )
 from leg_platform.community.models import Direction, ManagementSettings, PersonAssignment, TransformerCircuit
 from leg_platform.community.status import MeteringPointStatus
-from leg_platform.management import leg_views, location_views, metering_point_views, person_views
+from leg_platform.management import circuit_forms, circuit_views, leg_views, location_views, metering_point_views, person_views
 from leg_platform.management.printing.document import Column, DetailPage, PrintDocument, Section, Table
 
 DASH = "–"
@@ -369,7 +370,6 @@ class LocationArea(Area):
 
         def load():
             locations = list(found.queryset[:MAX_LIST_ENTRIES])
-            _rows, occupants = location_list.details(locations, found.today)
             items = []
             for location in locations:
                 address = f"{location.street} {location.house_number}"
@@ -379,8 +379,8 @@ class LocationArea(Area):
                 cells = [
                     with_problem(address, " ".join(problem)),
                     location_views.circuit_phrase(location),
-                    location_views.count_phrase(location.mp_count),
-                    location_views.occupancy_phrase(location.mp_count, occupants[location.pk]),
+                    location_views.list_count_phrase(location),
+                    location_views.occupancy_phrase(location.point_count, location.occupant_count),
                 ]
                 items.append(Item(location.pk, f"{location.street} {location.house_number}", cells, location))
             return items
@@ -398,7 +398,8 @@ class LocationArea(Area):
 
     def details(self, items, today):
         locations = [item.source for item in items]
-        rows, occupants = location_list.details(locations, today)
+        rows, _occupants = location_list.details(locations, today)
+        counted = location_views.counted_phrases([location.pk for location in locations], today)
         pages = []
         for location in locations:
             points = rows[location.pk]
@@ -449,12 +450,7 @@ class LocationArea(Area):
                 ),
                 self.assignments_section(location),
             ]
-            subtitle = " · ".join(
-                [
-                    location_views.circuit_phrase(location), location_views.count_phrase(len(points)),
-                    location_views.occupancy_phrase(len(points), occupants[location.pk]),
-                ]
-            )
+            subtitle = f"{location_views.circuit_phrase(location)} · {counted[location.pk]}"
             title = f"{location.street} {location.house_number}"
             if location.is_archived:
                 title += f" ({_('archived')})"
@@ -485,6 +481,91 @@ class LocationArea(Area):
         ]
         columns = [Column(_("Metering point"), 3.4), Column(_("Person"), 2.6), Column(_("From"), 1.2), Column(_("To"), 1.2)]
         return Section(_("History of the assignments"), table=Table(columns, rows, _("No assignments yet.")))
+
+
+class CircuitArea(Area):
+    """The transformer circuits (D-142): the list, and per circuit its facts, figures, locations and LEGs."""
+
+    key = "circuits"
+    filename = "transformer-circuits.pdf"
+    widths = {"number": 1.8, "name": 2.2, "source": 1.5, "locations": 1.3, "consumption": 1.5, "feed_in": 1.5, "legs": 2.6}
+
+    def name(self):
+        return _("Transformer circuits")
+
+    def prepare(self, params):
+        found = circuit_views.build_list(params)
+
+        def load():
+            items = []
+            for row in found.rows:
+                entry = circuit_views.list_entry(row)
+                cells = [
+                    row.circuit.grid_number,
+                    or_dash(row.circuit.name),
+                    entry["source_text"],
+                    str(row.locations),
+                    or_dash(entry["consumption_text"]),
+                    or_dash(entry["feed_in_text"]),
+                    ", ".join(name for _pk, name in row.legs) or DASH,
+                ]
+                items.append(Item(row.circuit.pk, row.circuit.grid_number, cells, row))
+            return items
+
+        return Prepared(
+            self, found.state, len(found.rows), [self.column(column) for column in found.columns],
+            self.info(found.state, found.columns, [], found.today), load,
+        )
+
+    def details(self, items, today):
+        pages = []
+        for item in items:
+            row = item.source
+            circuit = row.circuit
+            facts = Section(
+                _("Transformer circuit"),
+                [
+                    (_("Number"), circuit.grid_number),
+                    (_("Name"), or_dash(circuit.name)),
+                    (_("Source"), circuit_forms.source_text(row.source)),
+                ],
+            )
+            figures = Section(
+                _("Figures"),
+                [
+                    (_("Locations"), str(row.locations)),
+                    (str(Direction.CONSUMPTION.label), str(row.consumption)),
+                    (str(Direction.FEED_IN.label), str(row.feed_in)),
+                    (_("In a LEG"), str(row.points_in_leg)),
+                    (_("Not in a LEG"), str(row.points - row.points_in_leg)),
+                ],
+            )
+            location_rows = [
+                [f"{location.street} {location.house_number}", f"{location.postal_code} {location.town}",
+                 location_views.count_phrase(location.mp_count)]
+                for location in circuit_list.locations_of(circuit)
+            ]
+            location_table = Table(
+                [Column(_("Address"), 3.0), Column(_("Postal code, town"), 2.6), Column(_("Metering points"), 2.0)],
+                location_rows, _("No locations in this transformer circuit."),
+            )
+            leg_rows = [
+                [entry.leg.name, str(entry.here), str(entry.total)] for entry in circuit_list.legs_of(circuit, today)
+            ]
+            leg_table = Table(
+                [Column(_("LEG"), 3.6), Column(_("In this transformer circuit"), 2.2), Column(_("In total"), 1.6)],
+                leg_rows, _("No LEG has metering points in this transformer circuit."),
+            )
+            pages.append(
+                DetailPage(
+                    circuit.grid_number, location_views.count_phrase(row.points), [],
+                    [
+                        facts, figures, Section(_("Locations"), table=location_table),
+                        Section(_("LEGs"), table=leg_table),
+                    ],
+                )
+            )
+        return pages
 
 
 def step_options():
@@ -615,4 +696,6 @@ class MeteringPointArea(Area):
         return facts
 
 
-AREAS = {area.key: area for area in (PersonArea(), LocationArea(), LegArea(), MeteringPointArea())}
+AREAS = {
+    area.key: area for area in (PersonArea(), LocationArea(), LegArea(), CircuitArea(), MeteringPointArea())
+}

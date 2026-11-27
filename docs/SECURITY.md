@@ -212,6 +212,7 @@
     * The redirect after a create uses only a safe return address (`returns.after_create`, `with_parameter`: paths of this site). `origin_point_url` is built from view name and number.
     * Page scripts only help (no `innerHTML`, no dynamic code, answers as text).
     * Suggestion endpoints are GET only, staff only, at most ten texts for at least two characters, never an email address.
+      Exception: the circuit suggestions (`management:circuits_search`) answer also an empty text, without a budget; they hold circuit numbers and names only, no personal data (D-142).
     * The person search is counted per staff account (300 per minute, then 429 with `Retry-After`), cut to 100 characters and five words.
     * A `DoesNotExist` of a service is the normal refusal (`management.access.gone`, D-101).
   * **PDF printing.** No typed text reaches ReportLab as markup (escape, remove control characters, cut the length). The PDF is made in memory and sent with `Cache-Control: no-store, private`, `Content-Disposition: attachment` and a fixed file name. A failure logs only the kind of error. The bundled font is read only from the package directory.

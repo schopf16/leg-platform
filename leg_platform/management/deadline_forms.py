@@ -11,6 +11,7 @@ from django.utils.translation import gettext_lazy as _
 from leg_platform.accounts.models import EmailText
 from leg_platform.community import deadline_settings, grid_operator
 from leg_platform.community.models import ManagementSettings
+from leg_platform.management.form_fields import ManagementForm
 
 DAY_INPUT = {
     "class": "form-control mgmt-field-short tnum", "autocomplete": "off", "inputmode": "numeric", "maxlength": "10",
@@ -75,7 +76,7 @@ DEADLINES = (
 )
 
 
-class DeadlinesForm(forms.Form):
+class DeadlinesForm(ManagementForm):
     """The five deadlines (whole days from 1, any size: the owner sets no upper limit). ``deadline_values()`` is the
     cleaned set of numbers. (The time of the address directory run has its own form, ``RunTimeForm``: it is no
     deadline.)"""
@@ -134,7 +135,7 @@ class DeadlinesForm(forms.Form):
         return dict(self.cleaned_values)
 
 
-class RunTimeForm(forms.Form):
+class RunTimeForm(ManagementForm):
     """The time of day of the daily address directory run (KONZEPT 3a.5): its own small block of the settings page."""
 
     run_time = forms.TimeField(

@@ -18,7 +18,7 @@ from leg_platform.community.models import LEGAL_MINIMUM_QUOTA_PERCENT, GridOpera
 from leg_platform.community.settings_service import EDITABLE_FIELDS
 from leg_platform.management import navigation, overview_tasks
 from leg_platform.management.access import ManagementAccessMixin
-from leg_platform.management.deadline_forms import DEADLINES, DeadlinesForm, RunTimeForm
+from leg_platform.management.deadline_forms import DEADLINES, MAX_DIGITS, DeadlinesForm, RunTimeForm
 from leg_platform.management.forms import ADDRESS_FIELDS, ManagementSettingsForm
 
 
@@ -103,6 +103,16 @@ class SettingsFieldCheckView(ManagementAccessMixin, View):
         return JsonResponse({"message": str(errors[0]) if errors else ""})
 
 
+def days_text(value):
+    """The value of a deadline field for the closed row of its block: "2 days", or nothing when the typed text is no
+    whole number (the block is open then, the text stands in the field with the error)."""
+    text = str("" if value is None else value).strip()
+    if text.isascii() and text.isdigit() and len(text) <= MAX_DIGITS:
+        count = int(text)
+        return ngettext("%(count)d day", "%(count)d days", count) % {"count": count}
+    return ""
+
+
 class SettingsView(ManagementAccessMixin, View):
     """The settings page: every staff account may show and save it (D-086). Three forms, each with its own button: the
     cards sender, metering points and quota; the time of the address directory (``RunTimeView``); the reminders and
@@ -182,6 +192,7 @@ class SettingsView(ManagementAccessMixin, View):
                 "mail_texts": [EmailText.Key(key).label for key in deadline.mail_keys],
                 "effect": deadline.effect,
                 "field": deadline_form[deadline.field],
+                "value_text": days_text(deadline_form[deadline.field].value()),
             }
             for deadline in DEADLINES
         ]

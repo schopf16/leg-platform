@@ -6,7 +6,7 @@ asking the directory per row. "Not accept" is remembered for the address as it i
 
 from django.db import transaction
 
-from leg_platform.community import addressing, archived, history, location_egid, transformer_circuits
+from leg_platform.community import addressing, archived, history, location_egid, numbers, transformer_circuits
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import (
     ApplicationBuilding,
@@ -106,24 +106,24 @@ ADDRESS_FIELDS = ("street", "house_number", "postal_code", "town")
 
 
 def create_location(
-    *, street, house_number, postal_code, town, address_addition="", transformer_circuit=None, new_circuit=None,
+    *, street, house_number, postal_code, town, address_addition="", transformer_circuit=None, station=None,
     remark="", needs_confirmation=False, actor=None,
 ):
     """A new location; raises ``ValidationError`` (also for an existing address). The directory check runs once.
 
-    ``new_circuit`` = ``(grid number, name)`` creates a transformer circuit in the same transaction as the location
-    (D-095): if either fails nothing is kept; a wrong or existing number raises ``ValidationError`` with the keys
-    ``grid_number`` / ``name``. It replaces ``transformer_circuit``."""
+    ``transformer_circuit`` (a stored circuit) or ``station`` (the grid number of a station of the address directory;
+    its circuit is found or created in the same transaction, ``CircuitUnknown`` when the directory does not hold it,
+    D-142) is a choice by hand; without either the circuit follows the building."""
     location = Location(
         street=street, house_number=house_number, postal_code=postal_code, town=town,
         address_addition=address_addition, transformer_circuit=transformer_circuit,
-        circuit_manual=transformer_circuit is not None or new_circuit is not None,
+        circuit_manual=transformer_circuit is not None or bool(station),
         remark=remark.strip(), needs_confirmation=needs_confirmation,
     )
     location.full_clean()
     with transaction.atomic():
-        if new_circuit is not None:
-            location.transformer_circuit = transformer_circuits.create(*new_circuit)
+        if station:
+            location.transformer_circuit = _station_circuit(station, actor)
         location.save()
         history.record(location, HistoryEvent.CREATED, actor)
         location_egid.resolve(location, actor)
@@ -211,20 +211,41 @@ def _merge(source, target, actor):
     return target
 
 
-def set_circuit(location, circuit, actor=None, new_circuit=None):
-    """Assign the transformer circuit (None removes it); a change is logged. ``new_circuit`` = ``(grid number,
-    name)`` creates the circuit in the same transaction (D-095; ``ValidationError`` as for ``create_location``)."""
+class CircuitUnknown(Exception):
+    """The chosen grid number is neither a stored circuit nor a station of the address directory (D-142)."""
+
+
+def _station_circuit(number, actor):
+    """The circuit of a station of the directory, created when it is not stored yet; ``CircuitUnknown`` otherwise (also
+    while the directory cannot answer). Called inside the caller's transaction."""
+    found = transformer_circuits.find(number)
+    if found is not None:
+        return found
+    stations = transformer_circuits.directory_numbers()
+    if not stations or numbers.normalise_transformer_circuit_number(number) not in stations:
+        raise CircuitUnknown()
+    return transformer_circuits.find_or_create(number, actor)
+
+
+def set_circuit(location, circuit, actor=None, station=None):
+    """Choose the transformer circuit by hand (None: back to the automatic one, the circuit of the building); a change
+    is logged. ``station`` = the grid number of a station of the address directory (D-142): its circuit is found or
+    created in the same transaction, ``CircuitUnknown`` when the directory does not hold it."""
     with transaction.atomic():
         fresh = Location.objects.select_for_update().select_related("transformer_circuit").get(pk=location.pk)
         archived.ensure_open(fresh, archived.LOCATION)
-        if new_circuit is not None:
-            circuit = transformer_circuits.create(*new_circuit)
+        if station:
+            circuit = _station_circuit(station, actor)
         before = fresh.transformer_circuit
+        was_manual = fresh.circuit_manual
         fresh.circuit_manual = circuit is not None
         if circuit is None:
             # Back to the circuit of the building (the station of the directory), or none; ``derive`` logs a change.
-            fresh.save(update_fields=["circuit_manual", "updated_at"])
-            transformer_circuits.derive(fresh, actor, clear_when_unavailable=True)
+            # Only leaving a hand choice may clear the circuit while the stations cannot answer; an automatic circuit
+            # saved again unchanged keeps it (no save, no History unless the derivation itself changes it).
+            if was_manual:
+                fresh.save(update_fields=["circuit_manual", "updated_at"])
+            transformer_circuits.derive(fresh, actor, clear_when_unavailable=was_manual)
             return fresh
         if before == circuit:
             fresh.save(update_fields=["circuit_manual", "updated_at"])
