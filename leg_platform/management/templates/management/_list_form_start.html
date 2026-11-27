@@ -11,5 +11,5 @@ Context: ``list_state`` and ``search_placeholder``.
   {% for name, value in list_state.hidden %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
   <label class="mgmt-filter mgmt-filter-search">
     <span class="mgmt-filter-label">{% translate "Search" %}</span>
-    <input type="search" name="q" value="{{ list_state.query }}" placeholder="{{ search_placeholder }}" class="form-control" autocomplete="off" maxlength="200" data-search{% if list_state.focus == "q" %} autofocus{% endif %}>
+    <input type="search" name="q" value="{{ list_state.query }}" placeholder="{{ search_placeholder }}" class="form-control" autocomplete="off" data-lpignore="true" data-1p-ignore data-bwignore maxlength="200" data-search{% if list_state.focus == "q" %} autofocus{% endif %}>
   </label>

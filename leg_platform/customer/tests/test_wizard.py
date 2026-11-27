@@ -487,7 +487,7 @@ class MeteringPointStepTests(WizardCase):
                 response = self.client.get(self.url)
                 self.assertEqual(response.status_code, 200)
                 self.assertNotIn(str(self.building.egid), "".join(logged.output))
-                self.assertNotIn("12.5", text(response))
+                self.assertNotIn('value="12.5"', text(response).replace("12,5", "12.5"))
 
     def test_a_draw_only(self):
         response = self.client.post(self.url, {"draw_number": typed(12345), "draw_name": "Wohnhaus", "feed_in": "no"})

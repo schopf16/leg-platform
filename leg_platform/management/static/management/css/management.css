@@ -796,6 +796,23 @@ a.mgmt-sort:hover {
   margin-left: 8px;
 }
 
+/* A building in registration (D-140): the badge and "Edit address" on their own line under the address, aligned with
+   it (after the caret), so that the address is never cut by them; they wrap rather than widen the column. */
+.mgmt-pending-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 4px;
+  padding-left: 22px;
+  white-space: normal;
+}
+
+.mgmt-pending-line .mgmt-new,
+.mgmt-pending-line .mgmt-pending-edit {
+  margin-left: 0;
+}
+
 .mgmt-subwrap > td {
   padding: 0 0 10px;
   background: var(--bg);
@@ -1104,18 +1121,6 @@ a.mgmt-sort:hover {
 
 .mgmt-count-grid .mgmt-direction {
   justify-self: start;
-}
-
-.mgmt-circuit-form {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-}
-
-.mgmt-circuit-form .form-control {
-  flex: 1;
-  min-height: 40px;
 }
 
 .mgmt-icon-btn {
@@ -1679,6 +1684,25 @@ a.mgmt-sort:hover {
   color: var(--muted);
 }
 
+/* A tag that opens the page of what it names (the circuits of a LEG, D-142): the colour of a link. */
+a.mgmt-tag {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a.mgmt-tag:hover {
+  text-decoration: underline;
+}
+
+/* A second line of a list cell in the muted style (the points in registration of a location, D-140). */
+.mgmt-cell-sub {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .mgmt-phone-only-row {
   display: none;
 }
@@ -1947,6 +1971,24 @@ a.mgmt-sort:hover {
   }
 }
 
+/* The metering points of a LEG: the number (never cut, D-109), its direction and the action column alone need about
+   700 px, so the seven columns fit their card only from about 1400 px. Below 1440 px the card shows the rows as the
+   cards of the phone (all values, the circuit in full), never a table that scrolls sideways. */
+@media (min-width: 761px) and (max-width: 1439px) {
+  .mgmt-members-view {
+    display: none;
+  }
+
+  .mgmt-members-cards {
+    display: block;
+    padding: 0 16px 8px;
+  }
+
+  .mgmt-members-cards .mgmt-mp:first-child {
+    border-top: 0;
+  }
+}
+
 @media (min-width: 761px) and (max-width: 1099px) {
   .mgmt-two-cols {
     grid-template-columns: minmax(0, 1fr);
@@ -2096,10 +2138,6 @@ a.mgmt-sort:hover {
   background: var(--warm);
 }
 
-.mgmt-dialog-row.is-circuit-new {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
 .mgmt-card-buttons {
   display: flex;
   flex-wrap: wrap;
@@ -2233,10 +2271,6 @@ a.mgmt-sort:hover {
   /* The arrow of a closed select does not overlap a long option text (UX-011). */
   .mgmt-dialog .form-select {
     padding-right: 36px;
-  }
-
-  .mgmt-dialog-row.is-circuit-new {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -2636,13 +2670,59 @@ a.mgmt-sort:hover {
 
 /* The chapter "Reminders and deadlines" of the settings page. */
 .mgmt-deadline {
-  padding: 16px 0;
   border-top: 1px solid var(--line);
 }
 
-.mgmt-deadline h3 {
-  margin: 0 0 8px;
+/* A folded deadline block (DESIGN.md section 6): the whole row is the button, as the customer's building cards. */
+.mgmt-deadline-summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 48px;
+  padding: 8px 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.mgmt-deadline-summary::-webkit-details-marker {
+  display: none;
+}
+
+.mgmt-deadline-summary:hover {
+  background: var(--warm);
+}
+
+.mgmt-deadline-summary:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+}
+
+.mgmt-deadline-summary h3 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
   font-size: 18px;
+}
+
+.mgmt-deadline-value {
+  flex: none;
+  color: var(--muted);
+}
+
+.mgmt-deadline-chevron {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+
+.mgmt-deadline[open] > .mgmt-deadline-summary .mgmt-deadline-chevron {
+  transform: rotate(180deg);
+}
+
+.mgmt-deadline-body {
+  padding: 0 0 16px;
 }
 
 @media (max-width: 1099px) {

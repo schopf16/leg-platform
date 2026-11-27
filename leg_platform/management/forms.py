@@ -5,11 +5,12 @@ from django.utils.translation import gettext_lazy as _
 
 from leg_platform.community.models import ManagementSettings
 from leg_platform.community.settings_service import EDITABLE_FIELDS
+from leg_platform.management.form_fields import PasswordManagerIgnoreMixin
 
 ADDRESS_FIELDS = ("sender_street", "sender_house_number", "sender_postal_code", "sender_town")
 
 
-class ManagementSettingsForm(forms.ModelForm):
+class ManagementSettingsForm(PasswordManagerIgnoreMixin, forms.ModelForm):
     """Settings page form. The address addition is optional; country and identifier are required and upper-cased."""
 
     class Meta:

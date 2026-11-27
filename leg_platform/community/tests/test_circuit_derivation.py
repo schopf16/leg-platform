@@ -3,7 +3,7 @@
 
 Synthetic directory in the postal code 3063. What is proven: the station sets the circuit; a building the directory
 answers for without a station removes a derived circuit (one History entry); an address directory that cannot answer
-changes nothing (no save, no History); a hand choice and an archived location are left alone; the scheduled command
+changes nothing (no save, no History), also one without a completed station scan; a hand choice and an archived location are left alone; the scheduled command
 ``fill_transformer_circuits`` and its place in ``run_scheduled_tasks``; removing a hand choice while the directory
 cannot answer still removes it."""
 
@@ -75,6 +75,53 @@ class CircuitDerivationTests(TestCase):
         self.assertEqual(self.circuit_of(location), "TRA1")
         (entry,) = self.entries(location)
         self.assertEqual((entry.detail["old"], entry.detail["new"]), ("", "TRA1"))
+
+    def test_a_circuit_made_by_the_derivation_has_its_history_without_an_account(self):
+        location = self.location(WITH_STATION)
+
+        transformer_circuits.derive(location)
+
+        entry = history.entries_for(transformer_circuits.find("TRA1")).get()
+        self.assertEqual((entry.event, entry.actor, entry.detail), (HistoryEvent.CREATED, None, {"derived": True}))
+
+    def test_the_stations_of_the_directory_decide_the_source_of_a_circuit(self):
+        stations = transformer_circuits.directory_numbers()
+
+        self.assertEqual(stations, {"TRA1"})
+        self.assertEqual(transformer_circuits.source("TRA1", stations), transformer_circuits.SOURCE_OPERATOR)
+        self.assertEqual(transformer_circuits.source("TRA2", stations), transformer_circuits.SOURCE_MANUAL)
+        self.unavailable()
+        self.assertIsNone(transformer_circuits.directory_numbers())
+        self.assertEqual(transformer_circuits.source("TRA1", None), transformer_circuits.SOURCE_UNKNOWN)
+
+    def test_a_station_whose_building_left_the_directory_is_no_source(self):
+        TransformerStation.objects.create(
+            egid=999, postal_code="3063", name="Ittigen_TRA2", match=TransformerStation.Match.EXACT,
+            scanned_at=timezone.now(),
+        )
+
+        self.assertEqual(transformer_circuits.directory_numbers(), {"TRA1"})
+
+    def test_an_unreadable_station_table_is_no_answer(self):
+        with patch.object(TransformerStation.objects, "exists", side_effect=DatabaseError("locked")):
+            self.assertIsNone(transformer_circuits.directory_numbers())
+        with patch.object(TransformerStation.objects, "exclude", side_effect=DatabaseError("locked")):
+            self.assertIsNone(transformer_circuits.directory_numbers())
+
+    def test_a_directory_without_a_completed_scan_cannot_answer(self):
+        # A new instance or a reset directory file: addresses published, no station rows until the next weekly scan.
+        location = self.location(WITH_STATION, circuit="TRA1")
+        TransformerStation.objects.all().delete()
+        out = StringIO()
+
+        self.assertIsNone(transformer_circuits.directory_numbers())
+        self.assertIsNone(transformer_circuits.station_number(WITH_STATION))
+        self.assertFalse(transformer_circuits.derive(location))
+        call_command("fill_transformer_circuits", stdout=out)
+
+        self.assertIn("Changed the transformer circuit of 0 location(s).", out.getvalue())
+        self.assertEqual(self.circuit_of(location), "TRA1")
+        self.assertEqual(self.entries(location), [])
 
     def test_no_station_in_an_answering_directory_removes_a_derived_circuit(self):
         location = self.location(WITHOUT_STATION, circuit="TRA9")
@@ -149,3 +196,21 @@ class CircuitDerivationTests(TestCase):
         self.assertFalse(fresh.circuit_manual)
         self.assertIsNone(fresh.transformer_circuit)
         self.assertEqual(len(self.entries(location)), 1)
+
+    def assert_the_automatic_choice_saved_again_keeps_the_circuit(self, make_unavailable):
+        # Security re-check M-1: only leaving a hand choice may clear the circuit while the stations cannot answer.
+        location = self.location(WITH_STATION, circuit="TRA1")
+        make_unavailable()
+        before = Location.objects.get(pk=location.pk).updated_at
+
+        locations.set_circuit(location, None)
+
+        fresh = Location.objects.get(pk=location.pk)
+        self.assertEqual((self.circuit_of(location), fresh.circuit_manual, fresh.updated_at), ("TRA1", False, before))
+        self.assertEqual(self.entries(location), [])
+
+    def test_saving_the_automatic_choice_again_keeps_the_circuit_while_the_directory_cannot_answer(self):
+        self.assert_the_automatic_choice_saved_again_keeps_the_circuit(self.unavailable)
+
+    def test_saving_the_automatic_choice_again_keeps_the_circuit_without_station_rows(self):
+        self.assert_the_automatic_choice_saved_again_keeps_the_circuit(lambda: TransformerStation.objects.all().delete())

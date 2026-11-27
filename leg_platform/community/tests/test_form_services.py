@@ -1,14 +1,24 @@
 """The services behind the forms of the management area (D-093, D-095): the typed digits of a metering point number,
-changing the location and the plant data of a metering point, creating a location together with a new transformer
-circuit, and assigning a metering point to a LEG from the page of the LEG. Every refusal leaves the data as it was."""
+changing the location and the plant data of a metering point, creating a location together with the transformer
+circuit of a station (D-142), and assigning a metering point to a LEG from the page of the LEG. Every refusal leaves
+the data as it was."""
 
 from datetime import date
 from decimal import Decimal
+from unittest import mock
 
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase, TestCase, tag
 
-from leg_platform.community import assignments, history, leg_services, locations, metering_points, numbers
+from leg_platform.community import (
+    assignments,
+    history,
+    leg_services,
+    locations,
+    metering_points,
+    numbers,
+    transformer_circuits,
+)
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import Location, MeteringPoint, TransformerCircuit
 from leg_platform.community.tests.helpers import (
@@ -175,44 +185,44 @@ class CreatingALocationWithACircuitTests(TestCase):
     databases = {"default", "addresses"}  # creating a location asks the address directory once
     ADDRESS = {"street": "Bachweg", "house_number": "7", "postal_code": "3000", "town": "Bern"}
 
-    def test_the_circuit_and_the_location_are_created_in_one_transaction(self):
-        location = locations.create_location(**self.ADDRESS, new_circuit=("tra777", "Neu"))
-        self.assertEqual((location.transformer_circuit.grid_number, location.transformer_circuit.name), ("TRA777", "Neu"))
+    def stations(self, found):
+        return mock.patch.object(transformer_circuits, "directory_numbers", return_value=found)
+
+    def test_the_circuit_of_a_station_and_the_location_are_created_in_one_transaction(self):
+        with self.stations({"TRA777"}):
+            location = locations.create_location(**self.ADDRESS, station="tra777")
+        self.assertEqual((location.transformer_circuit.grid_number, location.circuit_manual), ("TRA777", True))
         self.assertEqual(TransformerCircuit.objects.count(), 1)
 
-    def test_a_refused_location_creates_no_circuit_and_a_refused_circuit_creates_no_location(self):
+    def test_a_refused_location_creates_no_circuit_and_an_unknown_station_creates_no_location(self):
         locations.create_location(**self.ADDRESS)
-        with self.assertRaises(ValidationError):
-            locations.create_location(**self.ADDRESS, new_circuit=("TRA888", ""))  # the address exists
+        with self.stations({"TRA888"}), self.assertRaises(ValidationError):
+            locations.create_location(**self.ADDRESS, station="TRA888")  # the address exists
         self.assertFalse(TransformerCircuit.objects.exists())
-        for number in ("555", "TRA", "tra-1", "", "TRA" + "9" * 40):
-            with self.subTest(number=number), self.assertRaises(ValidationError):
-                locations.create_location(**{**self.ADDRESS, "street": "Anderer Weg"}, new_circuit=(number, ""))
+        for found in (set(), None, {"TRA1"}):
+            with self.subTest(found=found), self.stations(found), self.assertRaises(locations.CircuitUnknown):
+                locations.create_location(**{**self.ADDRESS, "street": "Anderer Weg"}, station="TRA555")
         self.assertFalse(Location.objects.filter(street="Anderer Weg").exists())
         self.assertFalse(TransformerCircuit.objects.exists())
-        # A circuit that exists is not created a second time, and the location is not created either.
-        make_circuit("TRA999")
-        with self.assertRaises(ValidationError) as caught:
-            locations.create_location(**{**self.ADDRESS, "street": "Dritter Weg"}, new_circuit=("tra999", ""))
-        self.assertIn("grid_number", caught.exception.error_dict)
-        self.assertFalse(Location.objects.filter(street="Dritter Weg").exists())
-        self.assertEqual(TransformerCircuit.objects.count(), 1)
+        # A station that is stored already is used, not created a second time.
+        stored = make_circuit("TRA999")
+        location = locations.create_location(**{**self.ADDRESS, "street": "Dritter Weg"}, station="tra999")
+        self.assertEqual((location.transformer_circuit, TransformerCircuit.objects.count()), (stored, 1))
 
-    def test_changing_the_circuit_of_a_location_with_a_new_one_is_one_step(self):
+    def test_choosing_a_station_at_a_location_is_one_step(self):
         actor = staff_user("actor.circuit@example.org")
         location = make_location("Neuweg", "1")
-        changed = locations.set_circuit(location, None, actor, new_circuit=("TRA555", "Fuenf"))
+        with self.stations({"TRA555", "TRA556"}):
+            changed = locations.set_circuit(location, None, actor, station="TRA555")
         self.assertEqual(changed.transformer_circuit.grid_number, "TRA555")
         entry = history.entries_for(location).get(event=HistoryEvent.TRANSFORMER_CIRCUIT_CHANGED)
         self.assertEqual(entry.detail, {"old": "", "new": "TRA555"})
-        with self.assertRaises(ValidationError):
-            locations.set_circuit(location, None, actor, new_circuit=("TRA555", ""))  # exists: refused, nothing changes
-        location.refresh_from_db()
-        self.assertEqual(location.transformer_circuit.grid_number, "TRA555")
+        created = history.entries_for(changed.transformer_circuit).get()
+        self.assertEqual((created.event, created.actor), (HistoryEvent.CREATED, actor))
         location.is_archived = True
         location.save()
-        with self.assertRaises(locations.Archived):
-            locations.set_circuit(location, None, actor, new_circuit=("TRA556", ""))
+        with self.stations({"TRA555", "TRA556"}), self.assertRaises(locations.Archived):
+            locations.set_circuit(location, None, actor, station="TRA556")
         self.assertFalse(TransformerCircuit.objects.filter(grid_number="TRA556").exists())  # rolled back
 
 

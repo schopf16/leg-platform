@@ -41,6 +41,7 @@ MENU = (
     MenuEntry("persons", _("Persons"), "i-persons"),
     MenuEntry("locations", _("Locations"), "i-building"),
     MenuEntry("legs", _("LEGs"), "i-network"),
+    MenuEntry("circuits", _("Transformer circuits"), "i-circuit"),
     MenuEntry("metering_points", _("Metering points"), "i-metering"),
     MenuEntry("settings", _("Settings"), "i-settings"),
     MenuEntry("contracts", _("Contracts"), "i-document", after_mail_texts=True),

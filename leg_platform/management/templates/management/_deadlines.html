@@ -1,7 +1,8 @@
 {% load i18n %}{% comment %}
-The chapter "Reminders and deadlines" of the settings page (KONZEPT 5.8, D-103): one block per deadline with its name, the
-trigger, the number of days, the recipients, the mail texts ("Mail texts" of the administration: a link only for an account
-that may open them) and one sentence of effect. Whole days from 1. This
+The chapter "Reminders and deadlines" of the settings page (KONZEPT 5.8, D-103): one block per deadline, folded
+(``<details>``, closed; open when its field has an error; DESIGN.md section 6): the closed row shows the name and the
+current number of days, the open block the trigger, the recipients, the mail texts ("Mail texts" of the administration: a
+link only for an account that may open them), one sentence of effect and the days field. Whole days from 1. This
 chapter has its own form and button: a change that would delete drafts is asked once more with the old and the new value
 and the number of drafts. (The time of the address directory run is not a deadline: it has its own block, ``_run_time.html``.) Context:
 ``deadline_form``, ``deadline_rows``, ``mail_text_link``.
@@ -12,8 +13,13 @@ and the number of drafts. (The time of the address directory run is not a deadli
     <p class="mgmt-hint">{% translate "Whole days, at least 1. The texts of the emails are edited under Mail texts." %}</p>
     {% if deadline_form.errors %}{% with form=deadline_form %}{% include "accounts/_error_summary.html" %}{% endwith %}{% endif %}
     {% for row in deadline_rows %}
-      <div class="mgmt-deadline">
-        <h3>{{ row.name }}</h3>
+      <details class="mgmt-deadline"{% if row.field.errors %} open{% endif %}>
+        <summary class="mgmt-deadline-summary">
+          <h3>{{ row.name }}</h3>
+          <span class="mgmt-deadline-value tnum">{{ row.value_text }}</span>
+          <svg class="frame-icon mgmt-deadline-chevron" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+        </summary>
+        <div class="mgmt-deadline-body">
         <dl class="mgmt-facts">
           <div class="mgmt-fact"><dt>{% translate "Trigger" %}</dt><dd>{{ row.trigger }}</dd></div>
           <div class="mgmt-fact"><dt>{% translate "Recipient" %}</dt><dd>{{ row.recipient }}</dd></div>
@@ -21,7 +27,8 @@ and the number of drafts. (The time of the address directory run is not a deadli
           <div class="mgmt-fact"><dt>{% translate "Effect" %}</dt><dd>{{ row.effect }}</dd></div>
         </dl>
         {% include "management/_field_row.html" with field=row.field %}
-      </div>
+        </div>
+      </details>
     {% endfor %}
     <div class="mgmt-actions"><button type="submit" class="btn btn-primary">{% translate "Save reminders and deadlines" %}</button></div>
   </section>

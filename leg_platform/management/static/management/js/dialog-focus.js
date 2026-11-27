@@ -4,7 +4,8 @@
    - Not on a phone or any device with a coarse pointer or without hover: the keyboard that opens would cover
      about half of the screen and hide the lead sentence and the next fields.
    - Not when the dialog is shown again after an error: the error summary has the focus then.
-   - A text field that already holds a value gets the cursor at the end, so that typing adds to it.
+   - A text field that already holds a value gets the cursor at the end, so that typing adds to it; a combobox that
+     lists from the start (data-suggest-minimum="0", D-142) keeps its text selected, so that typing replaces it.
 
    Nothing is sent from here. */
 (() => {
@@ -18,7 +19,9 @@
     return;
   }
   target.focus();
-  if (typeof target.value === "string" && typeof target.setSelectionRange === "function") {
+  if (target.dataset.suggestMinimum === "0") {
+    target.select();
+  } else if (typeof target.value === "string" && typeof target.setSelectionRange === "function") {
     try {
       target.setSelectionRange(target.value.length, target.value.length);
     } catch (error) {

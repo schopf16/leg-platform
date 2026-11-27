@@ -3867,9 +3867,6 @@ msgstr "Trasferisci e salva"
 msgid "Edit remark"
 msgstr "Modifica osservazione"
 
-msgid "Change transformer circuit"
-msgstr "Modifica circuito del trasformatore"
-
 msgid "The change reaches 1 location."
 msgstr "La modifica riguarda 1 ubicazione."
 
@@ -4003,9 +4000,6 @@ msgstr "NPA, località"
 
 msgid "Grid"
 msgstr "Rete"
-
-msgid "Edit transformer circuit"
-msgstr "Modifica circuito del trasformatore"
 
 msgid "Locations in the transformer circuit"
 msgstr "Ubicazioni nel circuito del trasformatore"
@@ -5225,23 +5219,6 @@ msgstr ""
 msgid "No metering point chosen yet"
 msgstr "Nessun punto di misura ancora scelto"
 
-msgid "No transformer circuit"
-msgstr "Nessun circuito del trasformatore"
-
-msgid "+ Create new transformer circuit…"
-msgstr "+ Crea nuovo circuito del trasformatore…"
-
-msgid "Choose an existing transformer circuit or enter a new one, not both."
-msgstr ""
-"Scelga un circuito del trasformatore esistente oppure ne inserisca uno "
-"nuovo, non entrambi."
-
-msgid "Enter the %(operator)s number."
-msgstr "Inserisca il numero %(operator)s."
-
-msgid "This transformer circuit already exists. Choose it from the list."
-msgstr "Questo circuito del trasformatore esiste già. Lo scelga dall'elenco."
-
 msgid "TRA followed by digits, for example TRA21359."
 msgstr "TRA seguito da cifre, ad esempio TRA21359."
 
@@ -5318,13 +5295,6 @@ msgstr ""
 
 msgid "This location does not exist any more."
 msgstr "Questa ubicazione non esiste più."
-
-msgid ""
-"Choose the transformer circuit of the location %(address)s or create a new "
-"one."
-msgstr ""
-"Scelga il circuito del trasformatore dell'ubicazione %(address)s oppure ne "
-"crei uno nuovo."
 
 msgid ""
 "Choose a metering point that has no LEG yet. It is assigned to the LEG "
@@ -10204,3 +10174,149 @@ msgstr "Configurazione dello Swisseldex Datahub modificata"
 
 msgid "Swisseldex Datahub connection tested"
 msgstr "Connessione allo Swisseldex Datahub testata"
+
+#, python-format
+msgid "+ %(count)d building in registration"
+msgid_plural "+ %(count)d buildings in registration"
+msgstr[0] "+ %(count)d edificio con richiesta in corso"
+msgstr[1] "+ %(count)d edifici con richiesta in corso"
+
+msgid "The applicants of metering points in registration count too."
+msgstr "Contano anche i richiedenti di punti di misurazione con richiesta in corso."
+
+#, python-format
+msgid "%(count)d day"
+msgid_plural "%(count)d days"
+msgstr[0] "%(count)d giorno"
+msgstr[1] "%(count)d giorni"
+
+# Transformer circuits: menu, list, detail, the circuit field of a location (D-142)
+#, python-format
+msgid "Automatic (according to %(operator)s)"
+msgstr "Automatico (secondo %(operator)s)"
+
+#, python-format
+msgid "automatically (%(operator)s)"
+msgstr "automaticamente (%(operator)s)"
+
+msgid "manual"
+msgstr "manuale"
+
+msgid "unknown"
+msgstr "sconosciuta"
+
+msgid "Source:"
+msgstr "Fonte:"
+
+msgid "No transformer circuit found."
+msgstr "Nessun circuito del trasformatore trovato."
+
+msgid "This transformer circuit does not exist. Create it in the menu “Transformer circuits”."
+msgstr "Questo circuito del trasformatore non esiste. Crearlo nel menu «Circuiti del trasformatore»."
+
+msgid "Search by number or name. A new transformer circuit is created in the menu “Transformer circuits”."
+msgstr "Cercare per numero o nome. Un nuovo circuito del trasformatore si crea nel menu «Circuiti del trasformatore»."
+
+msgid "Choose transformer circuit"
+msgstr "Scegliere il circuito del trasformatore"
+
+#, python-format
+msgid "Choose the transformer circuit of the location %(address)s. “Automatic” takes it from the %(operator)s data."
+msgstr "Scegliere il circuito del trasformatore dell’ubicazione %(address)s. «Automatico» lo riprende dai dati di %(operator)s."
+
+msgid "Chosen by hand"
+msgstr "Scelto manualmente"
+
+#, python-format
+msgid "(%(count)d in registration)"
+msgstr "(%(count)d in fase di iscrizione)"
+
+#, python-format
+msgid "%(count)d in registration"
+msgstr "%(count)d in fase di iscrizione"
+
+msgid "Metering points of the transformer circuit that belong to a LEG, of all, for example 3 of 4."
+msgstr "Punti di misurazione del circuito del trasformatore che appartengono a una CEL, su tutti, per esempio 3 su 4."
+
+#, python-format
+msgid "%(operator)s: the number is a transformer station in the %(operator)s data of the address directory. Manual: entered by hand."
+msgstr "%(operator)s: il numero è una stazione di trasformazione nei dati di %(operator)s dell’elenco degli indirizzi. Manuale: inserito a mano."
+
+#, python-format
+msgid "%(part)d of %(total)d"
+msgstr "%(part)d su %(total)d"
+
+#, python-format
+msgid "%(first)d–%(last)d of %(total)d transformer circuits"
+msgstr "%(first)d–%(last)d di %(total)d circuiti del trasformatore"
+
+msgid "The transformer circuits with their locations, metering points and LEGs."
+msgstr "I circuiti del trasformatore con le loro ubicazioni, i punti di misurazione e le CEL."
+
+msgid "No transformer circuits yet."
+msgstr "Ancora nessun circuito del trasformatore."
+
+msgid "No transformer circuits found."
+msgstr "Nessun circuito del trasformatore trovato."
+
+msgid "no locations"
+msgstr "nessuna ubicazione"
+
+msgid "1 location"
+msgstr "1 ubicazione"
+
+#, python-format
+msgid "%(count)d locations"
+msgstr "%(count)d ubicazioni"
+
+msgid "Create transformer circuit"
+msgstr "Creare un circuito del trasformatore"
+
+#, python-format
+msgid "A transformer circuit of the %(operator)s grid. Afterwards it can be chosen at the locations."
+msgstr "Un circuito del trasformatore della rete di %(operator)s. In seguito può essere scelto per le ubicazioni."
+
+msgid "Rename transformer circuit"
+msgstr "Rinominare il circuito del trasformatore"
+
+msgid "Number, name or LEG"
+msgstr "Numero, nome o CEL"
+
+msgid "Go to the transformer circuit"
+msgstr "Al circuito del trasformatore"
+
+msgid "Back to transformer circuits"
+msgstr "Torna ai circuiti del trasformatore"
+
+msgid "Transformer circuit created. Next: choose it at the locations."
+msgstr "Circuito del trasformatore creato. Poi: sceglierlo per le ubicazioni."
+
+msgid "Rename"
+msgstr "Rinominare"
+
+msgid "Number"
+msgstr "Numero"
+
+msgid "Figures"
+msgstr "Cifre"
+
+msgid "In a LEG"
+msgstr "In una CEL"
+
+msgid "Not in a LEG"
+msgstr "In nessuna CEL"
+
+msgid "No locations in this transformer circuit."
+msgstr "Nessuna ubicazione in questo circuito del trasformatore."
+
+msgid "In this transformer circuit"
+msgstr "In questo circuito del trasformatore"
+
+msgid "In total"
+msgstr "In totale"
+
+msgid "No LEG has metering points in this transformer circuit."
+msgstr "Nessuna CEL ha punti di misurazione in questo circuito del trasformatore."
+
+msgid "Metering points of the LEG in this transformer circuit and in total."
+msgstr "Punti di misurazione della CEL in questo circuito del trasformatore e in totale."

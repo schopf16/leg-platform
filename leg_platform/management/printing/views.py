@@ -160,3 +160,7 @@ class LegPrintView(PrintView):
 
 class MeteringPointPrintView(PrintView):
     area_key = "metering_points"
+
+
+class CircuitPrintView(PrintView):
+    area_key = "circuits"

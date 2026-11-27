@@ -19,7 +19,10 @@ SETTINGS = "settings"
 APPLICATION = "application"
 DEREGISTRATION = "deregistration"
 CONTRACT = "contract"
-SUBJECT_TYPES = (LOCATION, METERING_POINT, LEG, PERSON, SETTINGS, APPLICATION, DEREGISTRATION, CONTRACT)
+TRANSFORMER_CIRCUIT = "transformer_circuit"
+SUBJECT_TYPES = (
+    LOCATION, METERING_POINT, LEG, PERSON, SETTINGS, APPLICATION, DEREGISTRATION, CONTRACT, TRANSFORMER_CIRCUIT,
+)
 
 
 class HistoryEvent(models.TextChoices):
@@ -108,6 +111,7 @@ def subject_of(obj):
         ManagementSettings,
         MeteringPoint,
         PersonRecord,
+        TransformerCircuit,
     )
 
     for model, subject_type in (
@@ -118,6 +122,7 @@ def subject_of(obj):
         (Application, APPLICATION),
         (Deregistration, DEREGISTRATION),
         (ContractVersion, CONTRACT),
+        (TransformerCircuit, TRANSFORMER_CIRCUIT),
     ):
         if isinstance(obj, model):
             return subject_type, obj.pk

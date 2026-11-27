@@ -23,7 +23,7 @@ from leg_platform.management import form_fields
 from leg_platform.management.leg_forms import LegCreateForm, LegPointForm, MasterDataForm, PercentField, QuotaForm
 from leg_platform.management.location_forms import (
     AddressEditForm,
-    CircuitFields,
+    CircuitChoiceFields,
     LocationCircuitForm,
     LocationCreateForm,
     RemarkForm,
@@ -122,10 +122,11 @@ class EntryPointsOfOtherSubjectsTests(TestCase):
         address = ["street", "house_number", "address_addition", "postal_code", "town"]
         self.assertEqual(signature(create, address), signature(edit, address))
         self.assertEqual(field_names(edit)[:5], address)
-        circuit = ["transformer_circuit", "new_circuit_number", "new_circuit_name"]
+        circuit = ["transformer_circuit"]
         self.assertEqual(signature(create, circuit), signature(LocationCircuitForm(), circuit))
         self.assertEqual(
-            [row for row in LocationCreateForm.layout if row in CircuitFields.circuit_layout], CircuitFields.circuit_layout
+            [row for row in LocationCreateForm.layout if row in CircuitChoiceFields.circuit_layout],
+            CircuitChoiceFields.circuit_layout,
         )
         self.assertEqual(signature(create, ["remark"]), signature(RemarkForm(), ["remark"]))
 

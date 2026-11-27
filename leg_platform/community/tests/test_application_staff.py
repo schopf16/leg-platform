@@ -282,6 +282,24 @@ class CompleteTests(StaffCase):
         self.assertEqual(code_of(lambda: self.complete(application)), "building_unavailable")
         self.assertEqual(MeteringPoint.objects.count(), 0)
 
+    def test_a_stored_location_at_the_address_with_another_egid_is_refused_and_nothing_is_kept(self):
+        # L-2 (D-140): same address, contradicting EGID: ``buildings.usable`` refuses it at the completion.
+        application = self.at_operator(feed_in=True)
+        stored = make_location(
+            street="Ittigenstrasse", house_number="51", postal_code="3063", town="Ittigen", egid=90004270
+        )
+
+        self.assertEqual(code_of(lambda: self.complete(application)), "building_unavailable")
+
+        application.refresh_from_db()
+        self.assertEqual(application.state, State.OPERATOR_CONFIRMED)
+        self.assertEqual(list(Location.objects.all()), [stored])
+        self.assertEqual((MeteringPoint.objects.count(), PersonAssignment.objects.count()), (0, 0))
+        self.assertIsNone(ApplicationBuilding.objects.get().location)
+        self.assertFalse(ApplicationMeteringPoint.objects.exclude(metering_point=None).exists())
+        stored.refresh_from_db()
+        self.assertEqual(stored.egid, 90004270)
+
     def test_the_customers_own_words_for_the_building_are_saved_per_account(self):
         from leg_platform.community import buildings
 

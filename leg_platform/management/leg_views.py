@@ -67,7 +67,7 @@ def member_columns():
     return (
         lists.Column("number", gettext_lazy("Metering point"), width=400, keep=True),
         lists.Column("address", gettext_lazy("Address"), width=150),
-        lists.Column("circuit", gettext_lazy("Transformer circuit"), width=100),
+        lists.Column("circuit", gettext_lazy("Transformer circuit"), width=140),
         lists.Column("status", gettext_lazy("Status"), width=130),
         lists.Column("occupant", gettext_lazy("Occupied by"), width=120),
     )
@@ -169,10 +169,11 @@ class LegDetailView(ManagementAccessMixin, View):
         can_change = not leg.is_archived
         show_delete = leg_services.can_delete(leg) and can_change
         level = legs.quota_level(leg.production_quota_percent, threshold)
-        circuits = list(
-            TransformerCircuit.objects.filter(pk__in=summary.circuit_ids).order_by("grid_number")
-            .values_list("grid_number", flat=True)
-        )
+        circuits = [
+            {"number": number, "url": reverse("management:circuits_detail", args=[pk])}
+            for pk, number in TransformerCircuit.objects.filter(pk__in=summary.circuit_ids).order_by("grid_number")
+            .values_list("pk", "grid_number")
+        ]
         context = {
             "page_title": leg.name,
             "leg": leg,
@@ -218,6 +219,9 @@ class LegDetailView(ManagementAccessMixin, View):
                     "address": f"{point.location.street} {point.location.house_number}" if point.location_id else "",
                     "location_url": reverse("management:locations_detail", args=[point.location_id])
                     if point.location_id else "",
+                    "circuit_url": reverse(
+                        "management:circuits_detail", args=[point.location.transformer_circuit_id]
+                    ) if point.location_id and point.location.transformer_circuit_id else "",
                     "occupant": occupants.get(point.pk, ""),
                     "has_person": point.pk in occupants,
                     "point_url": reverse("management:metering_points_detail", args=[point.pk]),

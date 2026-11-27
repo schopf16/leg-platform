@@ -5,14 +5,22 @@ metering point numbers, LEG names, person names), never the remarks.
 """
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from django.db.models import Case, Count, Exists, F, IntegerField, OuterRef, Q, Subquery, Value, When
 from django.db.models.functions import Cast, Coalesce
 from django.utils import timezone
 
-from leg_platform.community import numbers
-from leg_platform.community.models import LegAssignment, Location, MeteringPoint, PersonAssignment
+from leg_platform.community import buildings, numbers
+from leg_platform.community.models import (
+    Application,
+    ApplicationBuilding,
+    ApplicationMeteringPoint,
+    LegAssignment,
+    Location,
+    MeteringPoint,
+    PersonAssignment,
+)
 
 OCCUPANCY_ALL = "all"
 OCCUPANCY_OCCUPIED = "occupied"
@@ -21,11 +29,73 @@ OCCUPANCY_EMPTY = "empty"
 OCCUPANCY_ARCHIVED = "archived"
 
 DEFAULT_SORT = "address"
+MAX_WORDS = 5  # every word adds non-indexed LIKE conditions: the number of words is bounded, as in person_search
 
 
-def base_queryset(today=None):
-    """All locations with ``mp_count`` (metering points not archived) and ``person_count``
-    (persons with an assignment valid now or later, each once)."""
+def pending_points():
+    """The metering points of applications in flight (``Application.CORRECTABLE_STATES``) that are not stored yet."""
+    return ApplicationMeteringPoint.objects.filter(
+        building__application__state__in=Application.CORRECTABLE_STATES, metering_point__isnull=True
+    )
+
+
+def folded_buildings():
+    """``{building id: location id}``: the buildings of applications in flight without a location whose EGID or address
+    names a stored location they may be attached to (``buildings.existing_locations`` and ``buildings.usable``, the rule
+    of the completion). The list shows their metering points under that location, not as a row of their own; an
+    archived location or a contradicting EGID keeps the building apart. Two queries."""
+    rows = ApplicationBuilding.objects.filter(
+        application__state__in=Application.CORRECTABLE_STATES, location__isnull=True
+    ).values_list("pk", "egid", "street", "house_number", "postal_code", "town")
+    wanted = {pk: (egid, (street, number, postal_code, town)) for pk, egid, street, number, postal_code, town in rows}
+    found = buildings.existing_locations(wanted)
+    return {pk: location.pk for pk, location in found.items() if buildings.usable(location, wanted[pk][0])}
+
+
+def _at_locations(points, folded):
+    """``(location id, applicant id)`` of the pending ``points`` at a stored location, linked or folded."""
+    rows = points.filter(Q(building__location__isnull=False) | Q(building_id__in=list(folded))).values_list(
+        "building_id", "building__location_id", "building__application__person_id"
+    )
+    return [(location_id or folded[building_id], person_id) for building_id, location_id, person_id in rows]
+
+
+@dataclass
+class PendingHere:
+    """The metering points in registration at a stored location: their number and their applicants (person ids)."""
+
+    points: int = 0
+    applicants: set = field(default_factory=set)
+
+
+def pending_at_locations(folded):
+    """``{location id: PendingHere}`` of the metering points in registration at a stored location (one query)."""
+    found = {}
+    for location_id, person_id in _at_locations(pending_points(), folded):
+        here = found.setdefault(location_id, PendingHere())
+        here.points += 1
+        here.applicants.add(person_id)
+    return found
+
+
+def _occupants(pending, today):
+    """``{location id: count}`` for the locations with points in registration: the persons with an assignment valid now
+    or later and the applicants, each person once."""
+    persons = {location_id: set(here.applicants) for location_id, here in pending.items()}
+    assigned = PersonAssignment.objects.not_ended(today).filter(
+        metering_point__location_id__in=list(pending), metering_point__is_archived=False
+    ).values_list("metering_point__location_id", "person_id")
+    for location_id, person_id in assigned:
+        persons[location_id].add(person_id)
+    return {location_id: len(ids) for location_id, ids in persons.items()}
+
+
+def base_queryset(today=None, pending=None):
+    """All locations with ``mp_count`` (metering points not archived), ``person_count`` (persons with an assignment
+    valid now or later, each once), and from ``pending`` (``pending_at_locations``): ``pending_count`` (the metering
+    points in registration there), ``point_count`` (``mp_count`` plus ``pending_count``: the column "Metering points"
+    and its sort) and ``occupant_count`` (``person_count`` plus the applicants, each person once: the column
+    "Occupancy", its filter and its sort)."""
     today = today or timezone.localdate()
     points = (
         MeteringPoint.objects.filter(location=OuterRef("pk"), is_archived=False)
@@ -42,10 +112,22 @@ def base_queryset(today=None):
         .annotate(n=Count("person", distinct=True))
         .values("n")
     )
-    return Location.objects.select_related("transformer_circuit").annotate(
+    queryset = Location.objects.select_related("transformer_circuit").annotate(
         mp_count=Coalesce(Subquery(points, output_field=IntegerField()), Value(0)),
         person_count=Coalesce(Subquery(persons, output_field=IntegerField()), Value(0)),
     )
+    pending = pending or {}
+    occupants = _occupants(pending, today) if pending else {}
+    return queryset.annotate(
+        occupant_count=Case(
+            *(When(pk=location_id, then=Value(count)) for location_id, count in occupants.items()),
+            default=F("person_count"), output_field=IntegerField(),
+        ),
+        pending_count=Case(
+            *(When(pk=location_id, then=Value(here.points)) for location_id, here in pending.items()),
+            default=Value(0), output_field=IntegerField(),
+        ),
+    ).annotate(point_count=F("mp_count") + F("pending_count"))
 
 
 def apply_occupancy(queryset, value):
@@ -54,11 +136,11 @@ def apply_occupancy(queryset, value):
         return queryset.filter(is_archived=True)
     queryset = queryset.filter(is_archived=False)
     if value == OCCUPANCY_OCCUPIED:
-        return queryset.filter(person_count__gt=0)
+        return queryset.filter(occupant_count__gt=0)
     if value == OCCUPANCY_FREE:
-        return queryset.filter(mp_count__gt=0, person_count=0)
+        return queryset.filter(point_count__gt=0, occupant_count=0)
     if value == OCCUPANCY_EMPTY:
-        return queryset.filter(mp_count=0)
+        return queryset.filter(point_count=0, occupant_count=0)
     return queryset
 
 
@@ -70,15 +152,25 @@ def apply_problems(queryset):
     return queryset.filter(address_correction_open=True)
 
 
-def apply_search(queryset, text, *, include_assignments=True, today=None):
-    """Every word must match the address parts, the circuit (number, name), a metering point number and,
-    with ``include_assignments``, a LEG name or a person name. Identifiers are compared in capitals."""
+def _pending_matches(condition, folded):
+    """The ids of the stored locations with a metering point in registration that matches ``condition``."""
+    return {location_id for location_id, _person_id in _at_locations(pending_points().filter(condition), folded)}
+
+
+def apply_search(queryset, text, *, include_assignments=True, today=None, folded=None):
+    """Every word (at most ``MAX_WORDS``) must match the address parts, the circuit (number, name), a metering point
+    number and, with ``include_assignments``, a LEG name or a person name. Identifiers are compared in capitals. With
+    ``folded`` (``folded_buildings``) the number and the applicant of a metering point in registration there match too."""
     today = today or timezone.localdate()
     pasted = numbers.pasted_number(text)
-    if pasted is not None and MeteringPoint.objects.filter(number__contains=pasted).exists():
+    if pasted is not None:
         # A number copied from a page (its blocks stand apart, D-109): the locations that have it.
-        return queryset.filter(Exists(MeteringPoint.objects.filter(location=OuterRef("pk"), number__contains=pasted)))
-    for word in (text or "").split():
+        pending = _pending_matches(Q(number__contains=pasted), folded) if folded is not None else set()
+        if pending or MeteringPoint.objects.filter(number__contains=pasted).exists():
+            return queryset.filter(
+                Exists(MeteringPoint.objects.filter(location=OuterRef("pk"), number__contains=pasted)) | Q(pk__in=pending)
+            )
+    for word in (text or "").split()[:MAX_WORDS]:
         upper = word.upper()
         condition = (
             Q(street__icontains=word) | Q(house_number__icontains=word) | Q(postal_code__icontains=word)
@@ -100,6 +192,16 @@ def apply_search(queryset, text, *, include_assignments=True, today=None):
                     | Q(person__organisation_name__icontains=word)
                 )
             )
+        if folded is not None:
+            applicant = "building__application__person__"
+            condition |= Q(
+                pk__in=_pending_matches(
+                    Q(number__contains=upper) | Q(**{f"{applicant}first_name__icontains": word})
+                    | Q(**{f"{applicant}last_name__icontains": word})
+                    | Q(**{f"{applicant}organisation_name__icontains": word}),
+                    folded,
+                )
+            )
         queryset = queryset.filter(condition)
     return queryset
 
@@ -112,11 +214,12 @@ def apply_sort(queryset, key, descending=False):
     if key == "circuit":
         first = [F("transformer_circuit__grid_number")]
     elif key == "metering_points":
-        first = [F("mp_count")]
+        first = [F("point_count")]
     elif key == "occupancy":
         queryset = queryset.annotate(
             occupancy_rank=Case(
-                When(mp_count=0, then=Value(-1)), default=F("person_count"), output_field=IntegerField()
+                When(point_count=0, occupant_count=0, then=Value(-1)), default=F("occupant_count"),
+                output_field=IntegerField(),
             )
         )
         first = [F("occupancy_rank")]

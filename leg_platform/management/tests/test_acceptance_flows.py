@@ -13,6 +13,7 @@ import json
 import re
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 from django.core.exceptions import ValidationError
@@ -301,8 +302,8 @@ class RefusedRequestTests(MatrixBase):
         for name, data in (
             ("locations_address", {"street": "Neuweg", "house_number": "8", "postal_code": "3000", "town": "Bern"}),
             ("locations_remark", {"remark": "changed"}),
-            ("locations_circuit", {"transformer_circuit": str(self.circuit_two.pk)}),
-            ("locations_circuit", {"transformer_circuit": "__new__", "new_circuit_number": "TRA9999"}),
+            ("locations_circuit", {"transformer_circuit": "TRA2000"}),
+            ("locations_circuit", {"transformer_circuit": "TRA9999"}),
             ("locations_metering_point_new", {"direction": "consumption", "number_digits": "999"}),
             ("locations_metering_point_assign", {"metering_point": str(self.point_loose.pk)}),
             ("locations_confirm", {}),
@@ -426,28 +427,24 @@ class RefusedRequestTests(MatrixBase):
             self.assertIn(response.status_code, (302, 400))
 
     def test_a_circuit_text_that_is_hostile_is_refused_or_ignored(self):
+        """Only the automatic choice, a stored circuit or a station of the directory is a choice (D-142); anything else
+        is the form again and creates nothing."""
         before = snapshot()
-        hostile = ("x" * 10000, "TRA1000 · <script>", "\x00", "TRA-1", "tra 1000", "TRA" + "9" * 40, "ＴＲＡ１０００", "TRA1000")
+        hostile = ("x" * 10000, "\x00", "TRA-1", "tra 1000", "TRA" + "9" * 40, "\uff34\uff32\uff21\uff11", "TRA1000x", "__new__")
         for text in hostile:
             with self.subTest(choice=text[:20]):
-                # Only the id of a listed circuit or the marker of a new one is a choice; the answer is the form again.
                 response = self.post("locations_circuit", self.place, {"transformer_circuit": text})
-                self.assertEqual(response.status_code, 200)
-            with self.subTest(number=text[:20]):
-                response = self.post(
-                    "locations_circuit", self.place, {"transformer_circuit": "__new__", "new_circuit_number": text}
-                )
                 self.assertEqual(response.status_code, 200)
         self.assertEqual(snapshot(), before)
 
     def test_a_circuit_is_not_created_for_a_location_that_does_not_exist(self):
-        """F-1: a POST that creates a circuit for a location that does not exist is a 404 before anything is written
-        (the location is looked up first, so that no transformer circuit is created for nothing)."""
+        """F-1: a POST that would create the circuit of a station for a location that does not exist is a 404 before
+        anything is written (the location is looked up first)."""
         before = snapshot()
-        response = self.client.post(
-            reverse("management:locations_circuit", args=[999999]),
-            {"transformer_circuit": "__new__", "new_circuit_number": "TRA777", "new_circuit_name": "x"},
-        )
+        with patch.object(transformer_circuits, "directory_numbers", return_value={"TRA777"}):
+            response = self.client.post(
+                reverse("management:locations_circuit", args=[999999]), {"transformer_circuit": "TRA777"}
+            )
         self.assertEqual(response.status_code, 404)
         self.assertEqual(snapshot(), before)
 
@@ -489,20 +486,18 @@ class LifeOfTheObjectsTests(MatrixBase):
         transformer_circuits.create("TRA556", "Fuenf")
         self.assertEqual(TransformerCircuit.objects.filter(name="Fuenf").count(), 2)
 
-    def test_a_new_circuit_with_a_number_that_exists_is_refused_in_the_form_and_changes_it_not(self):
+    def test_a_circuit_with_a_number_that_exists_is_refused_in_the_form_and_changes_it_not(self):
         client = self.login(self.administrator)
         before = TransformerCircuit.objects.count()
-        response = client.post(
-            url("locations_circuit", self.place),
-            {"transformer_circuit": "__new__", "new_circuit_number": "tra1000", "new_circuit_name": "Other name"},
-        )
+        response = client.post(url("circuits_new"), {"grid_number": "tra1000", "name": "Other name"})
         self.assertEqual(response.status_code, 200)  # the form again, with the message at the number
-        self.assertContains(response, "Dieser Trafokreis existiert bereits. Wählen Sie ihn in der Liste.")
+        self.assertContains(response, "Diesen Trafokreis gibt es schon.")
         self.assertEqual(TransformerCircuit.objects.count(), before)
         self.circuit.refresh_from_db()
         self.assertEqual((self.circuit.grid_number, self.circuit.name), ("TRA1000", "Eins"))
-        # Changing a circuit into the number of another one is refused.
-        response = client.post(url("circuits_edit", self.circuit_two), {"grid_number": "tra1000", "name": "Zwei"})
+        # Changing a circuit entered by hand into the number of another one is refused.
+        with patch.object(transformer_circuits, "directory_numbers", return_value=set()):
+            response = client.post(url("circuits_edit", self.circuit_two), {"grid_number": "tra1000", "name": "Zwei"})
         self.assertEqual(response.status_code, 200)
         self.circuit_two.refresh_from_db()
         self.assertEqual(self.circuit_two.grid_number, "TRA2000")

@@ -10,6 +10,7 @@ LIST_KEYS = (
     "location_metering_points",
     "legs",
     "leg_metering_points",
+    "circuits",
     "metering_points",
     "processes",
     "contracts",

@@ -17,13 +17,13 @@ from leg_platform.accounts.models import EMAIL_MAX_LENGTH, SWITZERLAND, User, va
 from leg_platform.accounts.normalization import normalize_email_address
 from leg_platform.community import grid_operator, persons
 from leg_platform.community import iban as iban_module
-from leg_platform.management.form_fields import REMARK_ROWS, address_suggestions
+from leg_platform.management.form_fields import REMARK_ROWS, ManagementForm, address_suggestions
 
 CONTROL = {"class": "form-control", "autocomplete": "off"}
 SELECT = {"class": "form-select", "autocomplete": "off"}
 
 
-class NoteForm(forms.Form):
+class NoteForm(ManagementForm):
     note = forms.CharField(
         label=_("Note"), required=False, max_length=persons.NOTE_MAX_LENGTH,
         widget=forms.Textarea(attrs={"class": "form-control", "rows": REMARK_ROWS}),
@@ -32,7 +32,7 @@ class NoteForm(forms.Form):
     optional = ("note",)
 
 
-class PaymentForm(forms.Form):
+class PaymentForm(ManagementForm):
     """The payment card dialog (D-087). IBAN and paper invoice are customer data and are left out
     (``customer_data`` false) when the actor may not change the account (D-012)."""
 
@@ -72,7 +72,7 @@ class PaymentForm(forms.Form):
         return value
 
 
-class PersonDataForm(forms.Form):
+class PersonDataForm(ManagementForm):
     """Registration/profile fields entered by staff: one form to create a person and one per card. A subclass names
     its ``field_names`` and the ``groups`` of ``persons.GROUP_FIELDS`` whose rules apply. The model rules run
     through ``persons.group_errors`` on a copy of the account (same code as the service); ``values()`` feeds the
@@ -282,7 +282,7 @@ class BillingAddressForm(PersonDataForm):
     optional = ("post_office_box_number",)
 
 
-class SharesForm(forms.Form):
+class SharesForm(ManagementForm):
     """One change of the shares: the number (may be 0) that holds from a free day, also in the past (D-086)."""
 
     quantity = forms.IntegerField(

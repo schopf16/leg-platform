@@ -227,8 +227,8 @@ class AccessTests(TestCase):
 
     def test_the_menu_of_a_staff_account_has_every_entry_and_a_plain_account_has_none(self):
         links = [reverse(entry.url_name) for entry in navigation.MENU]
-        # overview, processes, persons, locations, LEGs, metering points, settings, contracts
-        self.assertEqual(len(links), 8)
+        # overview, processes, persons, locations, LEGs, transformer circuits, metering points, settings, contracts
+        self.assertEqual(len(links), 9)
         for user in (self.staff, self.administrator):
             for part in self.menu_parts(user):
                 with self.subTest(user=user.email):
@@ -273,7 +273,7 @@ class MenuRuleTests(SimpleTestCase):
     def test_an_active_staff_account_sees_every_entry_in_the_order_of_the_menu(self):
         self.assertEqual(
             self.keys(FakeUser()),
-            ["overview", "processes", "persons", "locations", "legs", "metering_points", "settings", "contracts"],
+            ["overview", "processes", "persons", "locations", "legs", "circuits", "metering_points", "settings", "contracts"],
         )
         self.assertEqual(self.keys(FakeUser()), [entry.key for entry in navigation.MENU])
 
